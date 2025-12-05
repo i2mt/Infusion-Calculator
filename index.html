@@ -28,6 +28,17 @@
     <div id="result"></div>
 </div>
 
-<script src="app.js"></script>
+<script src="engine.js"></script>
+<script>
+  // Wait for engine DB load before initializing UI
+  InfusionEngine.load().then(() => {
+    // populate UI drug dropdown, etc.
+    // example: console test
+    InfusionEngine.runSelfTest();
+  }).catch(err => {
+    console.error("Failed to initialize infusion engine:", err);
+  });
+</script>
+
 </body>
 </html>
