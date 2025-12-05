@@ -1,0 +1,76 @@
+{
+  "norepinephrine": {
+    "name": "Norepinephrine",
+    "dose_unit": "mcg/kg/min",
+    "dose_range": [0.05, 1],
+    "default_dose": 0.1,
+    "standard_concentrations": [
+      { "label": "4 mg in 250 mL (16 mcg/mL)", "mcg_per_ml": 16 },
+      { "label": "8 mg in 250 mL (32 mcg/mL)", "mcg_per_ml": 32 }
+    ],
+    "notes": "Central line recommended."
+  },
+
+  "epinephrine": {
+    "name": "Epinephrine",
+    "dose_unit": "mcg/kg/min",
+    "dose_range": [0.01, 1],
+    "default_dose": 0.05,
+    "standard_concentrations": [
+      { "label": "4 mg in 250 mL (16 mcg/mL)", "mcg_per_ml": 16 }
+    ]
+  },
+
+  "dopamine": {
+    "name": "Dopamine",
+    "dose_unit": "mcg/kg/min",
+    "dose_range": [2, 20],
+    "default_dose": 5,
+    "standard_concentrations": [
+      { "label": "400 mg in 250 mL (1600 mcg/mL)", "mcg_per_ml": 1600 }
+    ]
+  },
+
+  "insulin": {
+    "name": "Insulin Regular",
+    "dose_unit": "units/hr",
+    "dose_range": [1, 20],
+    "default_dose": 5,
+    "standard_concentrations": [
+      { "label": "50 units in 50 mL (1 unit/mL)", "units_per_ml": 1 }
+    ],
+    "notes": "Double-check with another nurse."
+  },
+
+  "labetalol": {
+    "name": "Labetalol",
+    "dose_unit": "mg/min",
+    "dose_range": [0.5, 2],
+    "default_dose": 1,
+    "standard_concentrations": [
+      { "label": "200 mg in 200 mL (1 mg/mL)", "mg_per_ml": 1 }
+    ]
+  },
+
+  "amiodarone": {
+    "name": "Amiodarone",
+    "dose_unit": "mg/min",
+    "dose_range": [0.5, 1],
+    "default_dose": 1,
+    "standard_concentrations": [
+      { "label": "450 mg in 250 mL (1.8 mg/mL)", "mg_per_ml": 1.8 }
+    ],
+    "notes": "Use inline filter; protect from light."
+  },
+
+  "lasix": {
+    "name": "Lasix (Furosemide)",
+    "dose_unit": "mg/hr",
+    "dose_range": [5, 20],
+    "default_dose": 10,
+    "standard_concentrations": [
+      { "label": "100 mg in 100 mL (1 mg/mL)", "mg_per_ml": 1 }
+    ],
+    "notes": "Monitor urine output and electrolytes."
+  }
+}
