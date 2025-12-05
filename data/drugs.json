@@ -1,83 +1,35 @@
 {
   "norepinephrine": {
-    "id": "norepinephrine",
     "name": "Norepinephrine",
-    "primary_unit": "mcg/kg/min",
-    "dose_types": ["mcg/kg/min", "mcg/min", "mcg/hr"],
-    "default_dose": 0.1,
-    "dose_range": { "min": 0.01, "max": 2.0 },
-    "presets": [
-      { "label": "Low", "value": 0.05 },
-      { "label": "Usual", "value": 0.1 },
-      { "label": "High", "value": 0.5 }
+    "categories": ["vasopressor"],
+    "units": "mcg/min",
+    "minDose": 1,
+    "maxDose": 30,
+    "availableVials": [
+      { "strength": "4mg/4ml", "amount": 4, "volume": 4 },
+      { "strength": "8mg/4ml", "amount": 8, "volume": 4 }
     ],
-    "vials": [
-      { "strength_mg": 4, "ampoule_volume_ml": 4, "note": "4 mg / 4 ml ampoule" },
-      { "strength_mg": 8, "ampoule_volume_ml": 8, "note": "8 mg / 8 ml ampoule" }
-    ],
-    "dilution_options_ml": [50,100,250],
-    "max_rate_mcg_per_min": 200,
-    "notes": "Prefer central line. Titrate to MAP.",
-    "guided_steps": [
-      "Confirm indication and check BP/HR.",
-      "Select ampoule strength available (4 mg or 8 mg).",
-      "Choose dilution volume (50 ml preferred for titration).",
-      "Calculate infusion and set pump accordingly.",
-      "Ask second nurse to verify the prepared infusion."
+    "defaultVialIndex": 0,
+    "defaultDilutions": [
+      { "type": "syringe", "volume": 50 },
+      { "type": "microset", "volume": 100 }
     ]
   },
 
-  "insulin_regular": {
-    "id": "insulin_regular",
-    "name": "Insulin (Regular)",
-    "primary_unit": "units/hr",
-    "dose_types": ["units/hr", "units/kg/hr"],
-    "default_dose": 1,
-    "dose_range": { "min": 0.1, "max": 50 },
-    "presets": [
-      { "label": "Start", "value": 1 },
-      { "label": "Sliding scale typical", "value": 5 }
+  "tng": {
+    "name": "Trinitroglycerin (TNG)",
+    "units": "mcg/min",
+    "minDose": 5,
+    "maxDose": 200,
+    "availableVials": [
+      { "strength": "5mg/5ml", "amount": 5, "volume": 5 },
+      { "strength": "10mg/10ml", "amount": 10, "volume": 10 }
     ],
-    "vials": [
-      { "strength_units": 100, "volume_ml": 10, "note": "100 units / 10 ml" },
-      { "strength_units": 50, "volume_ml": 5, "note": "50 units / 5 ml" }
-    ],
-    "dilution_options_ml": [50,100],
-    "max_rate_units_per_hr": 100,
-    "notes": "Follow hypoglycemia protocol. Double-check bedside measurements.",
-    "guided_steps": [
-      "Confirm blood glucose and indication for infusion.",
-      "Choose vial strength (100U/10ml is common).",
-      "Choose dilution (e.g., 50 ml syringe).",
-      "Set infusion: pump = (units/hr) / (units/ml).",
-      "Document start time and bedside glucose checks every 1 hour."
-    ]
-  },
-
-  "nitroglycerin": {
-    "id": "nitroglycerin",
-    "name": "Nitroglycerin (TNG)",
-    "primary_unit": "mcg/min",
-    "dose_types": ["mcg/min","mcg/kg/min"],
-    "default_dose": 50,
-    "dose_range": { "min": 5, "max": 400 },
-    "presets": [
-      { "label": "Common (low)", "value": 10 },
-      { "label": "Common (typical)", "value": 50 }
-    ],
-    "vials": [
-      { "strength_mg": 5, "ampoule_volume_ml": 5, "note": "5 mg in 5 ml (common)" },
-      { "strength_mg": 10, "ampoule_volume_ml": 10, "note": "10 mg in 10 ml" }
-    ],
-    "dilution_options_ml": [50,100],
-    "max_rate_mcg_per_min": 400,
-    "notes": "Watch for hypotension and headache. Protect from light.",
-    "guided_steps": [
-      "Select which ampoule is available (5mg preferred).",
-      "Choose dilution (50 ml syringe or 100 ml microset).",
-      "Enter target infusion in mcg/min (e.g., 50 mcg/min).",
-      "Calculator will show how many ampoules to add and pump rate.",
-      "Titrate slowly and monitor BP every 1–2 minutes initially."
+    "defaultVialIndex": 0,
+    "defaultDilutions": [
+      { "type": "syringe", "volume": 50 },
+      { "type": "microset", "volume": 100 },
+      { "type": "largeVolume", "volume": 500 }
     ]
   }
 }
