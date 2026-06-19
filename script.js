@@ -2987,29 +2987,25 @@ function handleDrugVoice(text, params) {
         }
     }
 
-    // --- Set dose ---
-    // Use params.dose first, else extract any number from the phrase
-    let doseVal = params.dose || extractNumberSimple(text);
-    if (doseVal !== null && doseVal > 0) {
-        if (DOM.doctorOrder) {
-            DOM.doctorOrder.value = doseVal;
-            DOM.doctorOrder.dataset.numericValue = doseVal;
-        }
-    } else {
-        showVoiceResult('دوز مشخص نشد. لطفاً مقدار دوز را بگویید.', 'error');
-        return;
+   // --- Set dose ---
+// Use params.dose first, else extract any number from the phrase
+let doseVal = params.dose || null;
+if (!doseVal || doseVal <= 0) {
+    // Try to find any number in the text that is not part of a drug name
+    const numberMatch = text.match(/\b(\d+(?:\.\d+)?)\b/);
+    if (numberMatch) {
+        doseVal = parseFloat(numberMatch[1]);
     }
-
-    console.log('📊 Final state:', {
-        drug: drug.persianName,
-        dose: doseVal,
-        useWeight: AppState.useWeight,
-        weight: DOM.patientWeight?.value || 'none',
-        method: AppState.infusionMethod,
-        volume: AppState.solutionVolume,
-        ampoules: AppState.ampouleCount,
-        reverseMode: AppState.reverseMode
-    });
+}
+if (doseVal !== null && doseVal > 0) {
+    if (DOM.doctorOrder) {
+        DOM.doctorOrder.value = doseVal;
+        DOM.doctorOrder.dataset.numericValue = doseVal;
+    }
+} else {
+    showVoiceResult('دوز مشخص نشد. لطفاً مقدار دوز را بگویید.', 'error');
+    return;
+}
 
        // --- Calculate ---
     try {
