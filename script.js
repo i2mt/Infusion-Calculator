@@ -2041,33 +2041,36 @@ window.startVoice = function() {
 
         let finalTranscript = '';
         recognition.onresult = function(event) {
-            let interim = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    finalTranscript += transcript;
-                } else {
-                    interim += transcript;
-                }
-            }
-            const displayText = finalTranscript || interim;
-            if (voiceTranscriptEl) {
-                voiceTranscriptEl.textContent = displayText || '...';
-                voiceTranscriptEl.classList.add('active');
-            }
-            if (voiceStatusEl) {
-                voiceStatusEl.textContent = finalTranscript ? 'در حال پردازش...' : 'گوش می‌کنم...';
-                voiceStatusEl.className = 'voice-status processing';
-            }
-            if (event.results[event.results.length - 1].isFinal) {
-                const command = finalTranscript.trim();
-                if (command) {
-                    processTextInput(command);
-                }
-                finalTranscript = '';
-                stopVoice();
-            }
-        };
+    let interim = '';
+    let finalTranscript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+        } else {
+            interim += transcript;
+        }
+    }
+    const displayText = finalTranscript || interim;
+    if (voiceTranscriptEl) {
+        voiceTranscriptEl.textContent = displayText || '...';
+        voiceTranscriptEl.classList.add('active');
+    }
+    if (voiceStatusEl) {
+        voiceStatusEl.textContent = finalTranscript ? 'در حال پردازش...' : 'گوش می‌کنم...';
+        voiceStatusEl.className = 'voice-status processing';
+    }
+    if (event.results[event.results.length - 1].isFinal) {
+        const command = finalTranscript.trim();
+        if (command) {
+            // Directly process the voice command (skip processTextInput double-call)
+            addToHistory(command);
+            processVoiceCommand(command);
+        }
+        finalTranscript = '';
+        stopVoice();
+    }
+};
 
         recognition.onerror = function(event) {
             console.warn('Voice error:', event.error);
@@ -2546,7 +2549,25 @@ function processVoiceCommand(text) {
     let normalized = PersianNumbers.toLatin(text);
     normalized = normalized.replace(/[،،]/g, ' ').replace(/\s+/g, ' ').trim();
     const lower = normalized.toLowerCase();
-
+// --- FAST PATH: Direct commands for speed ---
+    // Check for common commands first (no need for full parsing)
+    const fastCommands = {
+        'تاریک': () => { AppState.settings.themeMode = 'dark'; saveSettings(); applyThemeMode(); showVoiceResult('حالت تاریک فعال شد', 'success'); },
+        'روشن': () => { AppState.settings.themeMode = 'light'; saveSettings(); applyThemeMode(); showVoiceResult('حالت روشن فعال شد', 'success'); },
+        'فونت بزرگ': () => { AppState.settings.largeFont = true; saveSettings(); applySettings(); showVoiceResult('فونت بزرگ فعال شد', 'success'); },
+        'فونت معمولی': () => { AppState.settings.largeFont = false; saveSettings(); applySettings(); showVoiceResult('فونت معمولی فعال شد', 'success'); },
+        'راهنما': () => { showVoiceResult('دستورات نمونه: "هپارین ۱۲ واحد/کیلوگرم/ساعت وزن ۷۰", "BMI وزن ۷۵ قد ۱۷۵", "قطره ۵۰۰ میلی‌لیتر در ۸ ساعت", "تاریک", "فونت بزرگ"', 'info'); },
+        'ماشین حساب': () => { switchTab('calculator'); showVoiceResult('بخش ماشین حساب باز شد', 'success'); },
+        'داروها': () => { switchTab('drugs'); showVoiceResult('مرجع داروها باز شد', 'success'); },
+        'ابزارها': () => { switchTab('tools'); showVoiceResult('ابزارهای بالینی باز شد', 'success'); },
+    };
+    
+    for (const [key, fn] of Object.entries(fastCommands)) {
+        if (lower === key || lower === 'برو به ' + key || lower === 'رفتن به ' + key) {
+            fn();
+            return;
+        }
+    }
 // === Dark / Light mode ===
 if (lower.includes('dark mode') || lower.includes('دارک') || lower.includes('تاریک') || lower.includes('حالت شب')) {
     AppState.settings.themeMode = 'dark';
@@ -2978,26 +2999,43 @@ function handleDrugInfo(text, params) {
     // Switch to drugs tab
     switchTab('drugs');
 
-    // Find the accordion item by drug ID
-    const drugItem = document.querySelector(`.qref-accordion-item[data-drug-id="${drugId}"]`);
-    if (drugItem) {
-        const header = drugItem.querySelector('.qref-row');
-        if (header && header.dataset.bodyId) {
-            // Open the accordion using its body ID
-            toggleAccordionById(header.dataset.bodyId);
-            // Scroll to it after a short delay
-            setTimeout(() => {
-                drugItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 400);
+    // Wait for the tab to render, then find and open the accordion
+    setTimeout(() => {
+        // Find the accordion item by drug ID
+        const drugItem = document.querySelector(`.qref-accordion-item[data-drug-id="${drugId}"]`);
+        if (drugItem) {
+            const header = drugItem.querySelector('.qref-row');
+            if (header && header.dataset.bodyId) {
+                // Open the accordion using its body ID
+                toggleAccordionById(header.dataset.bodyId);
+                // Scroll to it after a short delay
+                setTimeout(() => {
+                    drugItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 400);
+            } else if (header) {
+                // Fallback: try to open by clicking the header
+                header.click();
+            }
         } else {
-            // Fallback: try to open by clicking the header
-            if (header) header.click();
+            // Fallback: search by drug name
+            const items = document.querySelectorAll('.qref-accordion-item');
+            for (const item of items) {
+                const nameEl = item.querySelector('.qref-name');
+                if (nameEl && nameEl.textContent.includes(drug.persianName)) {
+                    const header = item.querySelector('.qref-row');
+                    if (header && header.dataset.bodyId) {
+                        toggleAccordionById(header.dataset.bodyId);
+                        setTimeout(() => {
+                            item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 400);
+                    }
+                    break;
+                }
+            }
         }
-    } else {
-        showToast('اطلاعات دارو', `${drug.persianName} (${drug.englishName}) در بخش مرجع داروها موجود است.`, 'info');
-    }
-
-    showVoiceResult(`✅ اطلاعات ${drug.persianName} در بخش مرجع داروها باز شد.`, 'success');
+        
+        showVoiceResult(`✅ اطلاعات ${drug.persianName} در بخش مرجع داروها باز شد.`, 'success');
+    }, 300);
 }
 
 // ---- BMI (with accordion auto-open) ----
