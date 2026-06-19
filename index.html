@@ -1660,6 +1660,35 @@
             <div class="voice-status" id="voiceStatus">برای شروع، دکمه را بزنید</div>
             <div class="voice-transcript" id="voiceTranscript"></div>
             <div class="voice-result" id="voiceResult" style="display:none;"></div>
+			<!-- Command history -->
+<div class="voice-history" id="voiceHistory" style="display:none;">
+    <div class="voice-history-header">
+        <span><i class="fas fa-clock-rotate-left"></i> دستورات اخیر</span>
+        <button class="voice-history-clear" id="clearHistoryBtn" title="پاک کردن تاریخچه">پاک کردن</button>
+    </div>
+    <div class="voice-history-list" id="voiceHistoryList"></div>
+</div>
+
+<!-- Confirmation overlay -->
+<div class="voice-confirm-overlay" id="voiceConfirmOverlay" style="display:none;">
+    <div class="voice-confirm-box">
+        <div class="voice-confirm-icon"><i class="fas fa-question-circle"></i></div>
+        <div class="voice-confirm-text" id="voiceConfirmText">آیا این دستور درست است؟</div>
+        <div class="voice-confirm-actions">
+            <button class="voice-confirm-btn confirm" id="voiceConfirmYes">بله</button>
+            <button class="voice-confirm-btn cancel" id="voiceConfirmNo">خیر</button>
+        </div>
+    </div>
+</div>
+
+<!-- Text input fallback (always visible) -->
+<div class="voice-text-fallback">
+    <div class="voice-text-input-row">
+        <input type="text" id="voiceTextInput" placeholder="یا دستور خود را تایپ کنید..." dir="rtl">
+        <button class="voice-text-send" id="voiceTextSend"><i class="fas fa-paper-plane"></i></button>
+    </div>
+    <div class="voice-text-hint">مثال: "هپارین ۱۲ واحد/کیلوگرم/ساعت وزن ۷۰"</div>
+</div>
         </div>
         <div class="voice-examples">
             <h3>چند نمونه دستور</h3>
