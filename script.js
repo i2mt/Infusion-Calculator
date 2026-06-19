@@ -2387,7 +2387,7 @@ const COMMAND_KEYWORDS = {
         scoreWeight: 0.8
     },
     manual_calc: {
-        triggers: ['محاسبه دستی', 'دستی', 'manual calculation', 'custom calculation', 'محاسبه بدون دارو', 'محاسبه دلخواه'],
+        triggers: [' دستی', 'دستی', 'manual calculation', 'custom calculation', ' بدون دارو', ' دلخواه'],
         scoreWeight: 0.9
     },
     history: {
