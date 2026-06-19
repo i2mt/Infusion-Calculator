@@ -2766,7 +2766,12 @@ case 'ibw':
     }, 300);
     showVoiceResult('وزن ایده‌آل محاسبه شد', 'success');
     break;
-
+case 'manual_calc':
+    openManualCalculation();
+    // Ensure we are on calculator tab
+    switchTab('calculator');
+    showVoiceResult('محاسبه دستی باز شد', 'success');
+    break;
 case 'electrolyte':
     switchTab('tools');
     setTimeout(() => {
@@ -2999,23 +3004,36 @@ function handleDrugVoice(text, params) {
         reverseMode: AppState.reverseMode
     });
 
-    // --- Calculate ---
+       // --- Calculate ---
     try {
-        // Ensure the dose range indicator updates
+        // Ensure we are on the calculator tab so results are visible
+        if (AppState.currentTab !== 'calculator') {
+            switchTab('calculator');
+        }
+
+        // Update dose range indicator
         updateDoseRangeIndicator();
 
-        // If reverse mode, calculate reverse, else normal
+        // Calculate
         if (AppState.reverseMode) {
             calculateReverse();
         } else {
             calculateInfusion();
         }
+
+        // Ensure results section is scrolled into view after a short delay
+        setTimeout(() => {
+            const results = document.getElementById('resultsSection');
+            if (results && results.style.display === 'block') {
+                results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 300);
+
         showVoiceResult(`محاسبه ${drug.persianName} با دوز ${doseVal} انجام شد.`, 'success');
     } catch (e) {
         console.error('Calculation error:', e);
         showVoiceResult('خطا در محاسبه: ' + e.message, 'error');
     }
-}
 // Also if user explicitly said method, it overrides
 // (already handled by the existing code)
    
