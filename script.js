@@ -2025,13 +2025,82 @@ function extractParams(text) {
 
 // --- Command scoring (unchanged, but we add "settings" category) ---
 const COMMAND_KEYWORDS = {
-    // (keep previous lists)
-    // add settings
+    drug: {
+        triggers: ['دارو', 'دوز', 'انفوزیون', 'تزریق', 'پمپ', 'سرنگ', 'میکروگرم', 'میلی‌گرم', 'واحد', 'kg', 'kg/h', 'mcg', 'mg', 'units'],
+        scoreWeight: 1.0
+    },
+    bmi: {
+        triggers: ['bmi', 'شاخص توده', 'وزن', 'قد', 'body mass index'],
+        scoreWeight: 0.9
+    },
+    bsa: {
+        triggers: ['bsa', 'سطح بدن', 'body surface area', 'mosteller', 'dubois', 'haycock'],
+        scoreWeight: 0.9
+    },
+    crcl: {
+        triggers: ['crcl', 'creatinine clearance', 'کلیرانس کراتینین', 'کراتینین', 'سن', 'weight'],
+        scoreWeight: 0.9
+    },
+    drip: {
+        triggers: ['drip', 'قطره', 'سرعت قطره', 'gravity', 'ساعت', 'volume', 'حجم', 'زمان'],
+        scoreWeight: 0.9
+    },
+    convert: {
+        triggers: ['convert', 'تبدیل', 'mEq', 'meq', 'mg', 'to', 'به'],
+        scoreWeight: 0.9
+    },
+    gcs: {
+        triggers: ['gcs', 'گلاسکو', 'glasgow', 'coma', 'کما', 'eye', 'verbal', 'motor', 'چشمی', 'کلامی', 'حرکتی'],
+        scoreWeight: 0.8
+    },
+    rass: {
+        triggers: ['rass', 'ریچموند', 'richmond', 'agitation', 'sedation', 'آرام‌بخشی', 'آژیتیشن'],
+        scoreWeight: 0.8
+    },
+    braden: {
+        triggers: ['braden', 'برادن', 'pressure ulcer', 'زخم فشاری', 'sensory', 'moisture', 'activity', 'mobility', 'nutrition', 'friction'],
+        scoreWeight: 0.8
+    },
+    morse: {
+        triggers: ['morse', 'مورس', 'fall', 'سقوط', 'history', 'diagnosis', 'aid', 'gait', 'mental'],
+        scoreWeight: 0.8
+    },
+    burns: {
+        triggers: ['burns', 'سوختگی', 'tbsa', 'fire', 'آتش', 'پارکلند', 'parkland', 'قانون نُه', 'rule of nines'],
+        scoreWeight: 0.8
+    },
+    oxygen: {
+        triggers: ['oxygen', 'اکسیژن', 'کپسول', 'cylinder', 'flow', 'فشار', 'pressure', 'duration', 'مدت'],
+        scoreWeight: 0.8
+    },
+    vbg: {
+        triggers: ['vbg', 'abg', 'گاز خون', 'blood gas', 'ph', 'pco2', 'hco3', 'base excess', 'be', 'bicarbonate', 'بی‌کربنات'],
+        scoreWeight: 0.8
+    },
+    ventilator: {
+        triggers: ['ventilator', 'ونتیلاتور', 'tidal volume', 'حجم جاری', 'pbw', 'ARDS', 'lung protective', 'تهویه'],
+        scoreWeight: 0.8
+    },
+    nutrition: {
+        triggers: ['nutrition', 'تغذیه', 'کالری', 'calories', 'protein', 'پروتئین', 'bmr', 'harris', 'mifflin', 'استرس', 'stress'],
+        scoreWeight: 0.8
+    },
+    ysite: {
+        triggers: ['ysite', 'y-site', 'سازگاری', 'compatibility', 'تداخل', 'drug interaction', 'دارو', 'mix', 'مخلوط'],
+        scoreWeight: 0.8
+    },
+    reverse: {
+        triggers: ['reverse', 'معکوس', 'برعکس'],
+        scoreWeight: 0.9
+    },
+    help: {
+        triggers: ['help', 'راهنما', 'کمک', 'راهنمایی', 'نمونه', 'example'],
+        scoreWeight: 0.6
+    },
     settings: {
         triggers: ['dark mode', 'light mode', 'تاریک', 'روشن', 'large font', 'small font', 'فونت بزرگ', 'فونت کوچک'],
         scoreWeight: 0.7
-    },
-    // ... other categories (drug, bmi, bsa, crcl, drip, convert, gcs, rass, braden, morse, burns, oxygen, vbg, ventilator, nutrition, ysite, reverse, help)
+    }
 };
 
 function scoreCommand(text, params) {
@@ -2219,8 +2288,108 @@ function executeCommand(cmd, text, params) {
 
 // ---- Drug handler (already implemented, but we reuse the one from before) ----
 function handleDrugVoice(text, params) {
-    // use existing code from previous version
-    // ... (we'll keep it as is)
+    const drugId = params.drugId || findDrugName(text);
+    if (!drugId) {
+        showVoiceResult('دارو شناسایی نشد. لطفاً نام دارو را واضح بگویید.', 'error');
+        return;
+    }
+
+    selectDrug(drugId);
+    const drug = drugDatabase[drugId];
+
+    // Method
+    if (params.method) {
+        const methodBtns = document.querySelectorAll('.method-btn-compact');
+        methodBtns.forEach(btn => {
+            if (btn.dataset.method === params.method) btn.click();
+        });
+    }
+
+    // Volume
+    if (params.volume !== undefined) {
+        const methodKey = AppState.infusionMethod;
+        const volumes = drug.defaultSolutionVolumes[methodKey];
+        if (volumes.includes(params.volume)) {
+            const btns = document.querySelectorAll('.volume-preset-btn');
+            for (const btn of btns) {
+                if (parseInt(btn.dataset.volume) === params.volume) {
+                    btn.click();
+                    break;
+                }
+            }
+        } else {
+            if (DOM.customVolumeContainer) {
+                DOM.customVolumeContainer.style.display = 'flex';
+                DOM.customVolume.value = params.volume;
+                DOM.customVolume.dataset.numericValue = params.volume;
+                AppState.customVolume = true;
+                document.querySelectorAll('.volume-preset-btn').forEach(b => b.classList.remove('active'));
+            }
+        }
+    }
+
+    // Ampoules
+    if (params.ampoules) {
+        AppState.ampouleCount = Math.max(1, params.ampoules);
+        updateAmpouleInfo();
+        const ampDisplay = document.getElementById('ampouleCount');
+        if (ampDisplay) ampDisplay.textContent = AppState.ampouleCount;
+    }
+
+    // Custom amount
+    if (params.customAmount !== undefined && params.customUnit) {
+        const isInsulin = drug.id === 'insulin';
+        if (!isInsulin) {
+            const toggleRow = DOM.customAmountToggleClickRow;
+            if (toggleRow) toggleRow.click();
+        }
+        if (DOM.customAmountInput) {
+            DOM.customAmountInput.value = params.customAmount;
+            DOM.customAmountInput.dataset.numericValue = params.customAmount;
+        }
+    }
+
+    // Weight
+    const useWeight = (params.weight !== undefined) || (text.includes('/kg'));
+    if (useWeight && DOM.weightCheckbox && DOM.patientWeight) {
+        DOM.weightCheckbox.checked = true;
+        AppState.useWeight = true;
+        DOM.patientWeight.disabled = false;
+        if (DOM.weightIosToggle) DOM.weightIosToggle.classList.add('on');
+        if (DOM.weightInputRow) DOM.weightInputRow.style.display = 'flex';
+        const w = params.weight || drug.weightBased?.defaultWeight || 70;
+        DOM.patientWeight.value = w;
+        DOM.patientWeight.dataset.numericValue = w;
+        updateWeightBasedUnit(drug);
+    } else {
+        if (DOM.weightCheckbox) DOM.weightCheckbox.checked = false;
+        AppState.useWeight = false;
+        if (DOM.weightIosToggle) DOM.weightIosToggle.classList.remove('on');
+        if (DOM.weightInputRow) DOM.weightInputRow.style.display = 'none';
+        if (DOM.patientWeight) DOM.patientWeight.disabled = true;
+    }
+
+    // Dose
+    const doseVal = params.dose || extractNumberSimple(text);
+    if (DOM.doctorOrder && doseVal !== null) {
+        DOM.doctorOrder.value = doseVal;
+        DOM.doctorOrder.dataset.numericValue = doseVal;
+    }
+
+    if (doseVal === null) {
+        showVoiceResult('دوز مشخص نشد. لطفاً مقدار دوز را بگویید.', 'error');
+        return;
+    }
+
+    // Calculate
+    setTimeout(() => {
+        if (AppState.reverseMode) calculateReverse();
+        else calculateInfusion();
+        const drugName = drug.persianName;
+        const doseDisplay = doseVal + ' ' + (drug.weightBased && useWeight ? drug.weightBased.unit : drug.standardUnit);
+        showVoiceResult(`✅ محاسبه ${drugName} با دوز ${doseDisplay} انجام شد.`, 'success');
+        switchTab('calculator');
+    }, 400);
 }
 
 // ---- BMI ----
