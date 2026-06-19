@@ -1650,57 +1650,72 @@
                     </div>
                 </div>
             </div>
-<!-- Voice Assistant Tab -->
-<div class="tab-pane" id="voiceTab">
+<div id="voiceTab" class="tab-pane" style="display:none;">
     <div class="voice-container">
+        <!-- Header -->
         <div class="voice-header">
-            <h2><i class="fas fa-microphone-alt"></i> دستیار صوتی هوشمند</h2>
-            <p>فقط صحبت کنید، بقیه را به ما بسپارید</p>
-        </div>
-        <div class="voice-main">
-            <button class="voice-mic-btn" id="voiceMicBtn">
-                <i class="fas fa-microphone"></i>
-            </button>
-            <div class="voice-status" id="voiceStatus">برای شروع، دکمه را بزنید</div>
-           <div class="voice-transcript-wrapper">
-    <div class="voice-transcript" id="voiceTranscript"></div>
-    <button class="voice-copy-btn" id="voiceCopyBtn" title="کپی متن"><i class="fas fa-copy"></i></button>
-</div>
-            <div class="voice-result" id="voiceResult" style="display:none;"></div>
-            <!-- Command history -->
-<div class="voice-history" id="voiceHistory" style="display:none;">
-    <div class="voice-history-header">
-        <span><i class="fas fa-clock-rotate-left"></i> دستورات اخیر</span>
-        <button class="voice-history-clear" id="voiceClearHistoryBtn" title="پاک کردن تاریخچه">پاک کردن</button>
-    </div>
-    <div class="voice-history-list" id="voiceHistoryList"></div>
-</div>
-
-<!-- Text input fallback (always visible) -->
-<div class="voice-text-fallback">
-    <div class="voice-text-input-row">
-        <input type="text" id="voiceTextInput" placeholder="یا دستور خود را تایپ کنید..." dir="rtl">
-        <button class="voice-text-send" id="voiceTextSend"><i class="fas fa-paper-plane"></i></button>
-    </div>
-    <div class="voice-text-hint">مثال: "هپارین ۱۲ واحد/کیلوگرم/ساعت وزن ۷۰"</div>
-</div>
-        </div>
-        <div class="voice-examples">
-            <h3>چند نمونه دستور</h3>
-            <div class="voice-example-chips">
-                <button class="example-chip" data-command="heparin 12 units/kg/h weight 70">هپارین ۱۲ واحد/کیلوگرم/ساعت وزن ۷۰</button>
-                <button class="example-chip" data-command="BMI weight 75 height 175">BMI وزن ۷۵ قد ۱۷۵</button>
-                <button class="example-chip" data-command="drip rate 500 ml over 8 hours">قطره ۵۰۰ میلی‌لیتر در ۸ ساعت</button>
-                <button class="example-chip" data-command="BSA weight 70 height 170 mosteller">BSA وزن ۷۰ قد ۱۷۰ موستلر</button>
-                <button class="example-chip" data-command="creatinine clearance age 40 weight 70 creatinine 1.0 male">کلیرانس کراتینین سن ۴۰ وزن ۷۰ کراتینین ۱ مرد</button>
-                <button class="example-chip" data-command="convert 20 mEq sodium to mg">تبدیل ۲۰ mEq سدیم به mg</button>
-                <button class="example-chip" data-command="dark mode">حالت تاریک</button>
-                <button class="example-chip" data-command="light mode">حالت روشن</button>
+            <div class="voice-title">
+                <i class="fas fa-microchip voice-icon"></i>
+                <span>دستیار صوتی هوشمند</span>
             </div>
         </div>
+
+        <!-- Mic & Waveform -->
+        <div class="voice-mic-area">
+            <div class="voice-ring-container">
+                <div class="voice-ring ring-1"></div>
+                <div class="voice-ring ring-2"></div>
+                <div class="voice-ring ring-3"></div>
+                <button class="voice-mic-btn" id="voiceMicBtn">
+                    <i class="fas fa-microphone"></i>
+                </button>
+            </div>
+            <div class="voice-waveform" id="voiceWaveform">
+                <span></span><span></span><span></span>
+                <span></span><span></span><span></span>
+                <span></span><span></span><span></span>
+                <span></span><span></span><span></span>
+            </div>
+            <div class="voice-status" id="voiceStatus">برای شروع، دکمه را بزنید</div>
+        </div>
+
+        <!-- Transcript -->
+        <div class="voice-transcript-area">
+            <div class="voice-transcript-label">متن شما</div>
+            <div class="voice-transcript" id="voiceTranscript">...</div>
+        </div>
+
+        <!-- Result (dynamic) -->
+        <div class="voice-result" id="voiceResult" style="display:none;"></div>
+
+        <!-- Example chips -->
+        <div class="voice-examples">
+            <div class="voice-examples-label">نمونه دستورات</div>
+            <div class="voice-chips">
+                <span class="example-chip" data-command="هپارین ۱۲ واحد/کیلوگرم/ساعت وزن ۷۰">💉 هپارین</span>
+                <span class="example-chip" data-command="BMI وزن ۷۵ قد ۱۷۵">📊 BMI</span>
+                <span class="example-chip" data-command="GCS 4 5 6">🧠 GCS</span>
+                <span class="example-chip" data-command="قطره ۵۰۰ میلی‌لیتر در ۸ ساعت">💧 قطره</span>
+                <span class="example-chip" data-command="تاریک">🌙 تاریک</span>
+                <span class="example-chip" data-command="سازگاری هپارین و وانکومایسین">🔬 سازگاری</span>
+                <span class="example-chip" data-command="راهنما">❓ راهنما</span>
+            </div>
+        </div>
+
+        <!-- History -->
+        <div class="voice-history-section" id="voiceHistory" style="display:none;">
+            <div class="voice-history-label">تاریخچه</div>
+            <div class="voice-history-list" id="voiceHistoryList"></div>
+            <button class="voice-clear-history" id="voiceClearHistoryBtn">پاک کردن تاریخچه</button>
+        </div>
+
+        <!-- Text fallback -->
+        <div class="voice-text-fallback">
+            <input type="text" id="voiceTextInput" placeholder="یا دستور را اینجا بنویسید..." />
+            <button id="voiceTextSend"><i class="fas fa-arrow-left"></i></button>
+        </div>
     </div>
 </div>
-        </div>
 
         <!-- Bottom Tab Navigation -->
         <div class="tab-bar">
