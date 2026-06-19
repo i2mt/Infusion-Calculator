@@ -2240,79 +2240,83 @@ function extractParams(text) {
 // --- Command scoring (with settings and all tools) ---
 const COMMAND_KEYWORDS = {
     drug: {
-        triggers: ['دارو', 'دوز', 'انفوزیون', 'تزریق', 'پمپ', 'سرنگ', 'میکروگرم', 'میلی‌گرم', 'واحد', 'kg', 'kg/h', 'mcg', 'mg', 'units'],
+        triggers: ['دارو', 'دوز', 'انفوزیون', 'تزریق', 'پمپ', 'سرنگ', 'میکروگرم', 'میلی‌گرم', 'واحد', 'kg', 'kg/h', 'mcg', 'mg', 'units', 'میلی‌لیتر', 'سی‌سی', 'حجم', 'محلول', 'آمپول', 'ویال'],
         scoreWeight: 1.0
     },
+    druginfo: {
+        triggers: ['اطلاعات', 'درباره', 'توضیح', 'شرح', 'کاربرد', 'مقدار مصرف', 'نحوه مصرف', 'چیه', 'چیست', 'info', 'about', 'describe'],
+        scoreWeight: 0.9
+    },
     bmi: {
-        triggers: ['bmi', 'شاخص توده', 'وزن', 'قد', 'body mass index', 'بی ام آی', 'b.m.i'],
+        triggers: ['bmi', 'بی ام آی', 'b.m.i', 'شاخص توده', 'body mass index'],
         scoreWeight: 0.9
     },
     bsa: {
-        triggers: ['bsa', 'سطح بدن', 'body surface area', 'mosteller', 'dubois', 'haycock'],
+        triggers: ['bsa', 'بی اس ای', 'b.s.a', 'سطح بدن', 'body surface area', 'mosteller', 'dubois', 'haycock'],
         scoreWeight: 0.9
     },
     crcl: {
-        triggers: ['crcl', 'creatinine clearance', 'کلیرانس کراتینین', 'کراتینین', 'سن', 'weight'],
+        triggers: ['crcl', 'creatinine clearance', 'کلیرانس کراتینین', 'کراتینین', 'سن', 'weight', 'وزن'],
         scoreWeight: 0.9
     },
     drip: {
-        triggers: ['drip', 'قطره', 'سرعت قطره', 'gravity', 'ساعت', 'volume', 'حجم', 'زمان'],
+        triggers: ['drip', 'قطره', 'سرعت قطره', 'gravity', 'ساعت', 'volume', 'حجم', 'زمان', 'ست', 'میکروست', 'ماکروست'],
         scoreWeight: 0.9
     },
     convert: {
-        triggers: ['convert', 'تبدیل', 'mEq', 'meq', 'mg', 'to', 'به'],
+        triggers: ['convert', 'تبدیل', 'mEq', 'meq', 'mg', 'to', 'به', 'میلی‌اکی‌والان'],
         scoreWeight: 0.9
     },
     gcs: {
-        triggers: ['gcs', 'گلاسکو', 'glasgow', 'coma', 'کما', 'eye', 'verbal', 'motor', 'چشمی', 'کلامی', 'حرکتی'],
+        triggers: ['gcs', 'گلاسکو', 'glasgow', 'coma', 'کما', 'eye', 'verbal', 'motor', 'چشمی', 'کلامی', 'حرکتی', 'امتیاز'],
         scoreWeight: 0.8
     },
     rass: {
-        triggers: ['rass', 'ریچموند', 'richmond', 'agitation', 'sedation', 'آرام‌بخشی', 'آژیتیشن'],
+        triggers: ['rass', 'ریچموند', 'richmond', 'agitation', 'sedation', 'آرام‌بخشی', 'آژیتیشن', 'آرام', 'بی‌قرار'],
         scoreWeight: 0.8
     },
     braden: {
-        triggers: ['braden', 'برادن', 'pressure ulcer', 'زخم فشاری', 'sensory', 'moisture', 'activity', 'mobility', 'nutrition', 'friction'],
+        triggers: ['braden', 'برادن', 'pressure ulcer', 'زخم فشاری', 'sensory', 'moisture', 'activity', 'mobility', 'nutrition', 'friction', 'حس', 'رطوبت', 'فعالیت', 'تحرک', 'تغذیه', 'اصطکاک'],
         scoreWeight: 0.8
     },
     morse: {
-        triggers: ['morse', 'مورس', 'fall', 'سقوط', 'history', 'diagnosis', 'aid', 'gait', 'mental'],
+        triggers: ['morse', 'مورس', 'fall', 'سقوط', 'history', 'diagnosis', 'aid', 'gait', 'mental', 'افتادن', 'تشخیص', 'وسیله', 'راه رفتن', 'ذهنی'],
         scoreWeight: 0.8
     },
     burns: {
-        triggers: ['burns', 'سوختگی', 'tbsa', 'fire', 'آتش', 'پارکلند', 'parkland', 'قانون نُه', 'rule of nines'],
+        triggers: ['burns', 'سوختگی', 'tbsa', 'fire', 'آتش', 'پارکلند', 'parkland', 'قانون نُه', 'rule of nines', 'سطح سوختگی'],
         scoreWeight: 0.8
     },
     oxygen: {
-        triggers: ['oxygen', 'اکسیژن', 'کپسول', 'cylinder', 'flow', 'فشار', 'pressure', 'duration', 'مدت'],
+        triggers: ['oxygen', 'اکسیژن', 'کپسول', 'cylinder', 'flow', 'فشار', 'pressure', 'duration', 'مدت', 'جریان'],
         scoreWeight: 0.8
     },
     vbg: {
-        triggers: ['vbg', 'abg', 'گاز خون', 'blood gas', 'ph', 'pco2', 'hco3', 'base excess', 'be', 'bicarbonate', 'بی‌کربنات'],
+        triggers: ['vbg', 'abg', 'گاز خون', 'blood gas', 'ph', 'pco2', 'hco3', 'base excess', 'be', 'bicarbonate', 'بی‌کربنات', 'گازهای خون'],
         scoreWeight: 0.8
     },
     ventilator: {
-        triggers: ['ventilator', 'ونتیلاتور', 'tidal volume', 'حجم جاری', 'pbw', 'ARDS', 'lung protective', 'تهویه'],
+        triggers: ['ventilator', 'ونتیلاتور', 'tidal volume', 'حجم جاری', 'pbw', 'ARDS', 'lung protective', 'تهویه', 'حجم تنفسی'],
         scoreWeight: 0.8
     },
     nutrition: {
-        triggers: ['nutrition', 'تغذیه', 'کالری', 'calories', 'protein', 'پروتئین', 'bmr', 'harris', 'mifflin', 'استرس', 'stress'],
+        triggers: ['nutrition', 'تغذیه', 'کالری', 'calories', 'protein', 'پروتئین', 'bmr', 'harris', 'mifflin', 'استرس', 'stress', 'کالری نیاز'],
         scoreWeight: 0.8
     },
     ysite: {
-        triggers: ['ysite', 'y-site', 'سازگاری', 'compatibility', 'تداخل', 'drug interaction', 'دارو', 'mix', 'مخلوط'],
+        triggers: ['ysite', 'y-site', 'سازگاری', 'compatibility', 'تداخل', 'drug interaction', 'دارو', 'mix', 'مخلوط', 'همزمان', 'تزریق همزمان'],
         scoreWeight: 0.8
     },
     reverse: {
-        triggers: ['reverse', 'معکوس', 'برعکس'],
+        triggers: ['reverse', 'معکوس', 'برعکس', 'وارونه'],
         scoreWeight: 0.9
     },
     help: {
-        triggers: ['help', 'راهنما', 'کمک', 'راهنمایی', 'نمونه', 'example'],
+        triggers: ['help', 'راهنما', 'کمک', 'راهنمایی', 'نمونه', 'example', 'چه کارایی', 'چطور کار کنم'],
         scoreWeight: 0.6
     },
     settings: {
-        triggers: ['dark mode', 'light mode', 'تاریک', 'روشن', 'large font', 'small font', 'فونت بزرگ', 'فونت کوچک'],
+        triggers: ['dark mode', 'light mode', 'تاریک', 'روشن', 'دارک', 'لایت', 'large font', 'small font', 'فونت بزرگ', 'فونت کوچک', 'تم تاریک', 'تم روشن'],
         scoreWeight: 0.7
     }
 };
@@ -2327,6 +2331,7 @@ function scoreCommand(text, params) {
         }
         // bonuses
         if (cmd === 'drug' && params.drugId) score += 2;
+        if (cmd === 'druginfo' && params.drugId) score += 2;
         if (cmd === 'bmi' && params.weight && params.height) score += 2;
         if (cmd === 'bsa' && params.weight && params.height) score += 2;
         if (cmd === 'crcl' && params.age && params.weight && params.dose) score += 2;
@@ -2341,7 +2346,7 @@ function scoreCommand(text, params) {
         if (cmd === 'ventilator' && (params.height || params.weight)) score += 2;
         if (cmd === 'nutrition' && (params.weight || params.height || params.age)) score += 2;
         if (cmd === 'ysite' && (params.drug1 || params.drug2)) score += 2;
-        if (cmd === 'settings' && (text.includes('dark') || text.includes('light') || text.includes('font'))) score += 2;
+        if (cmd === 'settings' && (text.includes('dark') || text.includes('light') || text.includes('font') || text.includes('تاریک') || text.includes('روشن') || text.includes('دارک') || text.includes('لایت'))) score += 2;
         scores[cmd] = score * info.scoreWeight;
     }
     return scores;
@@ -2353,14 +2358,14 @@ function processVoiceCommand(text) {
     const lower = normalized.toLowerCase();
 
     // ---- Settings commands (early) ----
-    if (lower.includes('dark mode') || lower.includes('تاریک')) {
+    if (lower.includes('dark mode') || lower.includes('دارک') || lower.includes('تاریک')) {
         AppState.settings.themeMode = 'dark';
         saveSettings();
         applyThemeMode();
         showVoiceResult('حالت تاریک فعال شد', 'success');
         return;
     }
-    if (lower.includes('light mode') || lower.includes('روشن')) {
+    if (lower.includes('light mode') || lower.includes('لایت') || lower.includes('روشن')) {
         AppState.settings.themeMode = 'light';
         saveSettings();
         applyThemeMode();
@@ -2385,7 +2390,26 @@ function processVoiceCommand(text) {
     // ---- Extract params ----
     const params = extractParams(normalized);
 
-    // ---- Check for corrections (e.g., "no, I meant ...") ----
+    // ---- Drug info detection (early) ----
+    const infoTriggers = ['اطلاعات', 'درباره', 'توضیح', 'شرح', 'کاربرد', 'مقدار مصرف', 'نحوه مصرف', 'چیه', 'چیست', 'info', 'about', 'describe'];
+    const hasInfoTrigger = infoTriggers.some(t => lower.includes(t));
+    if (hasInfoTrigger) {
+        const drugId = params.drugId || findDrugName(normalized);
+        if (drugId) {
+            executeCommand('druginfo', normalized, { drugId });
+            return;
+        }
+    }
+
+    // ---- Disambiguate BMI vs BSA ----
+    if (lower.includes('سطح بدن') || lower.includes('body surface')) {
+        if (params.weight && params.height) {
+            executeCommand('bsa', normalized, params);
+            return;
+        }
+    }
+
+    // ---- Check for corrections ----
     if (lower.includes('no') || lower.includes('نه') || lower.includes('اشتباه')) {
         if (lastCommand) {
             showVoiceResult('دستور قبلی لغو شد. لطفاً دوباره بگویید.', 'info');
@@ -2403,7 +2427,6 @@ function processVoiceCommand(text) {
     // ---- FALLBACK: If no command scored, but we have weight & height -> assume BMI ----
     if (!best || best[1] === 0) {
         if (params.weight && params.height) {
-            // No command matched, but we have weight and height -> BMI
             executeCommand('bmi', normalized, params);
             return;
         }
@@ -2487,6 +2510,9 @@ function executeCommand(cmd, text, params) {
         case 'ysite':
             handleYSiteVoice(text, params);
             break;
+            case 'druginfo':
+    handleDrugInfo(text, params);
+    break;
         default:
             showVoiceResult('این دستور هنوز پشتیبانی نمی‌شود.', 'error');
     }
@@ -2546,7 +2572,18 @@ function handleDrugVoice(text, params) {
             }
         }
     }
-
+// --- Detect infusion method from volume or keywords ---
+if (params.volume !== undefined) {
+    if (params.volume <= 50) {
+        // Small volume -> syringe
+        params.method = 'syringe';
+    } else if (params.volume >= 100) {
+        // Large volume -> infusion
+        params.method = 'infusion';
+    }
+}
+// Also if user explicitly said method, it overrides
+// (already handled by the existing code)
     // Ampoules
     if (params.ampoules) {
         AppState.ampouleCount = Math.max(1, params.ampoules);
@@ -2599,7 +2636,43 @@ function handleDrugVoice(text, params) {
         showVoiceResult('دوز مشخص نشد. لطفاً مقدار دوز را بگویید.', 'error');
         return;
     }
+// ---- Drug Info ----
+function handleDrugInfo(text, params) {
+    const drugId = params.drugId || findDrugName(text);
+    if (!drugId) {
+        showVoiceResult('نام دارو مشخص نشد. لطفاً نام دارو را بگویید.', 'error');
+        return;
+    }
+    const drug = drugDatabase[drugId];
+    if (!drug) {
+        showVoiceResult('این دارو در پایگاه داده موجود نیست.', 'error');
+        return;
+    }
 
+    // Switch to drugs tab
+    switchTab('drugs');
+
+    // Find the accordion item for this drug and open it
+    const drugItem = document.querySelector(`.qref-accordion-item[data-drug-name*="${drug.persianName.toLowerCase()}"]`);
+    if (drugItem) {
+        if (!drugItem.classList.contains('open')) {
+            const header = drugItem.querySelector('.qref-row');
+            if (header) {
+                const bodyId = header.dataset.bodyId;
+                if (bodyId) {
+                    toggleAccordionById(bodyId);
+                }
+            }
+        }
+        setTimeout(() => {
+            drugItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 400);
+    } else {
+        showToast('اطلاعات دارو', `${drug.persianName} (${drug.englishName}) در بخش مرجع داروها موجود است.`, 'info');
+    }
+
+    showVoiceResult(`✅ اطلاعات ${drug.persianName} در بخش مرجع داروها باز شد.`, 'success');
+}
     // Calculate
     setTimeout(() => {
         if (AppState.reverseMode) calculateReverse();
