@@ -2249,6 +2249,14 @@ function setupVoiceTab() {
 const originalStartVoice = window.startVoice || function() {};
 window.startVoice = function() {
     if (voiceActive) return;
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch(e) {
+        showToast('خطا', 'دسترسی به میکروفون داده نشد', 'error');
+        return;
+    }
+}
     // Lazy init recognition (same as original)
     if (!recognition) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2497,6 +2505,13 @@ if (heightFallback && !params.height) {
             }
         }
     });
+        // --- Fallback: extract any number if no dose was found ---
+    if (!params.dose) {
+        const anyNumber = text.match(/(\d+(?:\.\d+)?)/);
+        if (anyNumber) {
+            params.dose = parseFloat(anyNumber[1]);
+        }
+    }
 
     // --- GCS without labels ---
     if (!params.gcs_eye && !params.gcs_verbal && !params.gcs_motor) {
