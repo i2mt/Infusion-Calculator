@@ -3018,59 +3018,7 @@ function handleDrugVoice(text, params) {
 }
 // Also if user explicitly said method, it overrides
 // (already handled by the existing code)
-    // Ampoules
-    if (params.ampoules) {
-        AppState.ampouleCount = Math.max(1, params.ampoules);
-        updateAmpouleInfo();
-        const ampDisplay = document.getElementById('ampouleCount');
-        if (ampDisplay) ampDisplay.textContent = AppState.ampouleCount;
-    }
-
-    // Custom amount
-    if (params.customAmount !== undefined && params.customUnit) {
-        const isInsulin = drug.id === 'insulin';
-        if (!isInsulin) {
-            const toggleRow = DOM.customAmountToggleClickRow;
-            if (toggleRow) toggleRow.click();
-        }
-        if (DOM.customAmountInput) {
-            DOM.customAmountInput.value = params.customAmount;
-            DOM.customAmountInput.dataset.numericValue = params.customAmount;
-        }
-    }
-
-    // Weight
-    const useWeight = (params.weight !== undefined) || (text.includes('/kg'));
-    if (useWeight && DOM.weightCheckbox && DOM.patientWeight) {
-        DOM.weightCheckbox.checked = true;
-        AppState.useWeight = true;
-        DOM.patientWeight.disabled = false;
-        if (DOM.weightIosToggle) DOM.weightIosToggle.classList.add('on');
-        if (DOM.weightInputRow) DOM.weightInputRow.style.display = 'flex';
-        const w = params.weight || drug.weightBased?.defaultWeight || 70;
-        DOM.patientWeight.value = w;
-        DOM.patientWeight.dataset.numericValue = w;
-        updateWeightBasedUnit(drug);
-    } else {
-        if (DOM.weightCheckbox) DOM.weightCheckbox.checked = false;
-        AppState.useWeight = false;
-        if (DOM.weightIosToggle) DOM.weightIosToggle.classList.remove('on');
-        if (DOM.weightInputRow) DOM.weightInputRow.style.display = 'none';
-        if (DOM.patientWeight) DOM.patientWeight.disabled = true;
-    }
-
-    // Dose
-    const doseVal = params.dose || extractNumberSimple(text);
-    if (DOM.doctorOrder && doseVal !== null) {
-        DOM.doctorOrder.value = doseVal;
-        DOM.doctorOrder.dataset.numericValue = doseVal;
-    }
-
-    if (doseVal === null) {
-        showVoiceResult('دوز مشخص نشد. لطفاً مقدار دوز را بگویید.', 'error');
-        return;
-    }
-}
+   
 // ---- Drug Info ----
 function handleDrugInfo(text, params) {
     const drugId = params.drugId || findDrugName(text);
