@@ -3323,7 +3323,6 @@ function handleYSiteVoice(text, params) {
     switchTab('tools');
     setTimeout(() => openAccordionById('ysiteAccordionItem'), 300);
 }
-}
 // ---- findDrugName, extractNumberSimple, etc. ----
 function findDrugName(text) {
     const lower = text.toLowerCase();
