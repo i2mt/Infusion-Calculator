@@ -1616,6 +1616,132 @@ function setupEventListeners() {
         });
     });
 }
+// ============================================
+// SETTINGS EVENT LISTENERS
+// ============================================
+function setupSettingsEventListeners() {
+    // Dark mode toggle (from settings modal)
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    if (darkModeToggle) {
+        darkModeToggle.addEventListener('change', function() {
+            AppState.settings.darkMode = this.checked;
+            AppState.settings.themeMode = this.checked ? 'dark' : 'light';
+            if (DOM.themeModeSelect) DOM.themeModeSelect.value = AppState.settings.themeMode;
+            saveSettings();
+            applySettings();
+        });
+    }
+
+    // Large font toggle
+    const largeFontToggle = document.getElementById('largeFontToggle');
+    if (largeFontToggle) {
+        largeFontToggle.addEventListener('change', function() {
+            AppState.settings.largeFont = this.checked;
+            saveSettings();
+            applySettings();
+        });
+    }
+
+    // Dose alerts
+    const doseAlertToggle = document.getElementById('doseAlertToggle');
+    if (doseAlertToggle) {
+        doseAlertToggle.addEventListener('change', function() {
+            AppState.settings.doseAlerts = this.checked;
+            saveSettings();
+        });
+    }
+
+    // Compatibility alerts
+    const compatAlertToggle = document.getElementById('compatAlertToggle');
+    if (compatAlertToggle) {
+        compatAlertToggle.addEventListener('change', function() {
+            AppState.settings.compatAlerts = this.checked;
+            saveSettings();
+        });
+    }
+
+    // Save history
+    const saveHistoryToggle = document.getElementById('saveHistoryToggle');
+    if (saveHistoryToggle) {
+        saveHistoryToggle.addEventListener('change', function() {
+            AppState.settings.saveHistory = this.checked;
+            saveSettings();
+        });
+    }
+
+    // Clear calculation history (settings modal)
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    if (clearHistoryBtn) {
+        clearHistoryBtn.addEventListener('click', function() {
+            if (confirm('آیا از پاک کردن تاریخچه اطمینان دارید؟')) {
+                localStorage.removeItem('calculationHistory');
+                showToast('تاریخچه پاک شد', 'تمامی محاسبات ذخیره شده حذف شدند.', 'success');
+            }
+        });
+    }
+
+    // Haptic feedback
+    const hapticToggle = document.getElementById('hapticToggle');
+    if (hapticToggle) {
+        hapticToggle.addEventListener('change', function() {
+            AppState.settings.hapticFeedback = this.checked;
+            saveSettings();
+            if (this.checked) haptic(40);
+        });
+    }
+
+    // Export data
+    const exportDataBtn = document.getElementById('exportDataBtn');
+    if (exportDataBtn) {
+        exportDataBtn.addEventListener('click', exportHistory);
+    }
+
+    // Theme mode dropdown (if still present – fallback)
+    const themeModeSelect = document.getElementById('themeModeSelect');
+    if (themeModeSelect) {
+        themeModeSelect.addEventListener('change', function() {
+            AppState.settings.themeMode = this.value;
+            saveSettings();
+            applyThemeMode();
+            if (DOM.darkModeToggle) DOM.darkModeToggle.checked = AppState.settings.darkMode;
+        });
+    }
+
+    // Theme mode 3-button row
+    const themeBtns = document.querySelectorAll('#themeModeButtons .theme-mode-btn');
+    themeBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            AppState.settings.themeMode = this.dataset.mode;
+            saveSettings();
+            applyThemeMode();
+            syncThemeModeButtons();
+        });
+    });
+
+    // Check for updates
+    const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+    if (checkUpdateBtn) {
+        checkUpdateBtn.addEventListener('click', async function() {
+            this.disabled = true;
+            const origHTML = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> در حال بررسی...';
+            try {
+                const reg = await navigator.serviceWorker.getRegistration();
+                if (reg) {
+                    await reg.update();
+                    if (reg.waiting) {
+                        showUpdateBanner();
+                    } else {
+                        showToast('بروز است', 'شما آخرین نسخه FoxiMed را دارید', 'success');
+                    }
+                }
+            } catch(e) {
+                showToast('خطا', 'بررسی به‌روزرسانی ممکن نشد', 'error');
+            }
+            setTimeout(() => { this.disabled = false; this.innerHTML = origHTML; }, 1500);
+        });
+    }
+}
 
 // ============================================
 // VOICE ASSISTANT — ENHANCED EDITION
