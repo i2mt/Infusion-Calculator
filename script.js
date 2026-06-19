@@ -2632,33 +2632,24 @@ if (lower.includes('small font') || lower.includes('فونت کوچک') || lower
     }
 
     // ---- Score commands ----
-    const scores = scoreCommand(normalized, params);
-    const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-    const best = sorted[0];
+    // ---- Score commands ----
+const scores = scoreCommand(normalized, params);
+const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+const best = sorted[0];
 
-    // ---- FALLBACK: If no command scored, but we have weight & height -> assume BMI ----
-    if (!best || best[1] === 0) {
-        if (params.weight && params.height) {
-            executeCommand('bmi', normalized, params);
-            return;
-        }
-        showVoiceResult('متوجه نشدم. لطفاً واضح‌تر بگویید یا از دکمه‌های نمونه استفاده کنید.', 'error');
+// FALLBACK: if no command scored, but we have weight & height -> assume BMI
+if (!best || best[1] === 0) {
+    if (params.weight && params.height) {
+        executeCommand('bmi', normalized, params);
         return;
     }
-
-    const cmd = best[0];
-
-    // ---- Confirm (if high‑confidence, skip; else ask) ----
-    const confidence = best[1];
-    if (confidence < 5) {
-        confirmCommand(normalized, params).then(ok => {
-            if (ok) executeCommand(cmd, normalized, params);
-            else showVoiceResult('دستور لغو شد.', 'info');
-        });
-    } else {
-        executeCommand(cmd, normalized, params);
-    }
+    showVoiceResult('متوجه نشدم. لطفاً واضح‌تر بگویید یا از دکمه‌های نمونه استفاده کنید.', 'error');
+    return;
 }
+
+const cmd = best[0];
+// No confirmation – execute immediately
+executeCommand(cmd, normalized, params);
 
 // ---- Execute command ----
 function executeCommand(cmd, text, params) {
