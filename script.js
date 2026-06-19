@@ -1926,10 +1926,12 @@ function startVoice() {
         voiceResultEl.innerHTML = '';
     }
     try {
-        recognition.start();
-    } catch (e) {
-        // already started
-    }
+    recognition.start();
+} catch (e) {
+    console.warn('Voice start error:', e);
+    showToast('خطا', 'دسترسی به میکروفون داده نشد یا مشکلی وجود دارد', 'error');
+    stopVoice(); // reset UI
+}
 }
 
 function stopVoice() {
