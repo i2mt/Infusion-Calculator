@@ -2226,7 +2226,15 @@ function extractParams(text) {
             break;
         }
     }
-
+// --- Extra fallback: capture weight/height even without unit ---
+const weightFallback = text.match(/وزن\s*(\d+(?:\.\d+)?)/i);
+if (weightFallback && !params.weight) {
+    params.weight = parseFloat(weightFallback[1]);
+}
+const heightFallback = text.match(/قد\s*(\d+(?:\.\d+)?)/i);
+if (heightFallback && !params.height) {
+    params.height = parseFloat(heightFallback[1]);
+}
     // --- ENHANCED: Extract height (Persian & English) ---
     const heightPatterns = [
         /(?:قد|قدش|قد بیمار|height)\s*(\d+(?:\.\d+)?)\s*(?:cm|سانتی‌متر|سانت)?/i,
@@ -2807,10 +2815,9 @@ case 'weight_convert':
 case 'dose_calc':
     switchTab('tools');
     setTimeout(() => {
-        // Populate from drug picker if possible, then calculate
         populateDoseCalcFromDrug();
         calculateDose();
-        openAccordionForTool('doseResult', 'doseCalcAccordionItem');
+        // remove the broken openAccordionForTool
     }, 300);
     showVoiceResult('محاسبه دوز انجام شد', 'success');
     break;
@@ -2819,7 +2826,7 @@ case 'compat_tool':
     switchTab('tools');
     setTimeout(() => {
         checkCompatibility();
-        openAccordionForTool('compatResult', 'compatAccordionItem');
+        // remove the broken openAccordionForTool
     }, 300);
     showVoiceResult('بررسی سازگاری انجام شد', 'success');
     break;
@@ -2908,6 +2915,21 @@ function handleDrugVoice(text, params) {
                 document.querySelectorAll('.volume-preset-btn').forEach(b => b.classList.remove('active'));
             }
         }
+        if (doseVal !== null && doseVal > 0) {
+    // If weight‑based, ensure weight is set
+    const drug = drugDatabase[drugId];
+    if (drug.weightBased && drug.weightBased.active && AppState.useWeight) {
+        const w = parseFloat(DOM.patientWeight?.dataset.numericValue) || 0;
+        if (w <= 0) {
+            showVoiceResult('وزن بیمار را مشخص کنید.', 'error');
+            return;
+        }
+    }
+    // Calculate
+    if (AppState.reverseMode) calculateReverse();
+    else calculateInfusion();
+    showVoiceResult('محاسبه انجام شد.', 'success');
+}
     }
 // --- Detect infusion method from volume or keywords ---
 if (params.volume !== undefined) {
@@ -3031,6 +3053,9 @@ function handleDrugInfo(text, params) {
 
 // ---- BMI (with accordion auto-open) ----
 function handleBMIVoice(params) {
+    switchTab('tools');
+    setTimeout(() => openAccordionById('bmiAccordionItem'), 300);
+
     const w = params.weight || 0;
     const h = params.height || 0;
     if (!w || !h) {
@@ -3043,8 +3068,6 @@ function handleBMIVoice(params) {
     const result = document.getElementById('bmiResult');
     const msg = result ? 'BMI محاسبه شد: ' + (result.textContent || result.innerText) : 'BMI محاسبه شد';
     showVoiceResult(msg, 'success');
-    switchTab('tools');
-    setTimeout(() => openAccordionById('bmiAccordionItem'), 300);
 }
 
 // ---- BSA ----
@@ -3150,18 +3173,23 @@ function handleConvertVoice(text, params) {
 
 // ---- GCS ----
 function handleGCSVoice(text, params) {
+    // Open the accordion first
+    switchTab('tools');
+    setTimeout(() => openAccordionById('gcsAccordionItem'), 300);
+
     let e = params.gcs_eye || 0;
     let v = params.gcs_verbal || 0;
     let m = params.gcs_motor || 0;
     if (!e || !v || !m) {
         const nums = text.match(/(\d+)\s*(\d+)\s*(\d+)/);
         if (nums) {
-            e = parseInt(nums[1]); v = parseInt(nums[2]); m = parseInt(nums[3]);
+            e = parseInt(nums[1]);
+            v = parseInt(nums[2]);
+            m = parseInt(nums[3]);
         }
     }
     if (!e || !v || !m) {
         showVoiceResult('لطفاً سه عدد برای GCS وارد کنید (مثال: GCS 4 5 6)', 'error');
-        switchTab('tools');
         return;
     }
     document.querySelectorAll('.gcs-btn[data-domain="eye"]').forEach(btn => {
@@ -3174,12 +3202,13 @@ function handleGCSVoice(text, params) {
         if (parseInt(btn.dataset.score) === m) btn.click();
     });
     showVoiceResult(`GCS محاسبه شد: E${e} V${v} M${m}`, 'success');
-    switchTab('tools');
-    setTimeout(() => openAccordionById('gcsAccordionItem'), 300);
 }
 
 // ---- RASS ----
 function handleRASSVoice(text, params) {
+    switchTab('tools');
+    setTimeout(() => openAccordionById('rassAccordionItem'), 300);
+
     let score = params.rassScore;
     if (score === undefined) {
         const match = text.match(/([+-]?\d+)/);
@@ -3187,23 +3216,22 @@ function handleRASSVoice(text, params) {
     }
     if (score === undefined || score < -5 || score > 4) {
         showVoiceResult('لطفاً عدد RASS را بین -5 تا 4 وارد کنید (مثال: RASS 2)', 'error');
-        switchTab('tools');
         return;
     }
     document.querySelectorAll('.rass-level').forEach(level => {
         if (parseInt(level.dataset.score) === score) level.click();
     });
     showVoiceResult(`RASS ${score} تنظیم شد`, 'success');
-    switchTab('tools');
-    setTimeout(() => openAccordionById('rassAccordionItem'), 300);
 }
 
 // ---- Braden ----
 function handleBradenVoice(params) {
+    switchTab('tools');
+    setTimeout(() => openAccordionById('bradenAccordionItem'), 300);
+
     const scores = params.bradenScores;
     if (!scores || scores.length !== 6) {
-        showVoiceResult('لطفاً ۶ عدد برای برادن وارد کنید (حس، رطوبت، فعالیت، تحرک، تغذیه، اصطکاک)', 'error');
-        switchTab('tools');
+        showVoiceResult('لطفاً ۶ عدد برای برادن وارد کنید (حس، رطوبت، فعالیت، تحرک، تغذیه، اصطکاک)', 'info');
         return;
     }
     const domains = ['sensory', 'moisture', 'activity', 'mobility', 'nutrition', 'friction'];
@@ -3213,16 +3241,16 @@ function handleBradenVoice(params) {
         });
     });
     showVoiceResult('مقیاس برادن تنظیم شد', 'success');
-    switchTab('tools');
-    setTimeout(() => openAccordionById('bradenAccordionItem'), 300);
 }
 
 // ---- Morse ----
 function handleMorseVoice(params) {
+    switchTab('tools');
+    setTimeout(() => openAccordionById('morseAccordionItem'), 300);
+
     const scores = params.morseScores;
     if (!scores || scores.length !== 6) {
-        showVoiceResult('لطفاً ۶ عدد برای مورس وارد کنید (سابقه سقوط، تشخیص ثانویه، وسیله کمکی، IV، راه رفتن، وضعیت ذهنی)', 'error');
-        switchTab('tools');
+        showVoiceResult('لطفاً ۶ عدد برای مورس وارد کنید (سابقه سقوط، تشخیص ثانویه، وسیله کمکی، IV، راه رفتن، وضعیت ذهنی)', 'info');
         return;
     }
     const domains = ['fallHistory', 'secDiag', 'aid', 'iv', 'gait', 'mental'];
@@ -3232,8 +3260,6 @@ function handleMorseVoice(params) {
         });
     });
     showVoiceResult('مقیاس مورس تنظیم شد', 'success');
-    switchTab('tools');
-    setTimeout(() => openAccordionById('morseAccordionItem'), 300);
 }
 
 // ---- Burns ----
@@ -3271,12 +3297,14 @@ function handleOxygenVoice(params) {
 
 // ---- VBG ----
 function handleVBGVoice(text, params) {
+    switchTab('tools');
+    setTimeout(() => openAccordionById('vbgAccordionItem'), 300);
+
     const pH = params.pH || 0;
     const pco2 = params.pco2 || 0;
     const hco3 = params.hco3 || 0;
     if (!pH || !pco2 || !hco3) {
         showVoiceResult('لطفاً pH، pCO₂ و HCO₃ را وارد کنید (مثال: VBG pH 7.4 pco2 45 hco3 24)', 'error');
-        switchTab('tools');
         return;
     }
     document.getElementById('vbgPH').value = pH;
@@ -3285,17 +3313,17 @@ function handleVBGVoice(text, params) {
     if (params.be) document.getElementById('vbgBE').value = params.be;
     interpretVBG();
     showVoiceResult('تفسیر گازهای خون انجام شد', 'success');
-    switchTab('tools');
-    setTimeout(() => openAccordionById('vbgAccordionItem'), 300);
 }
 
 // ---- Ventilator ----
 function handleVentilatorVoice(text, params) {
+    switchTab('tools');
+    setTimeout(() => openAccordionById('ventilatorAccordionItem'), 300);
+
     const height = params.height || 0;
     const gender = params.gender || 'male';
     if (!height) {
         showVoiceResult('لطفاً قد بیمار را وارد کنید (مثال: ونتیلاتور قد ۱۷۵ مرد)', 'error');
-        switchTab('tools');
         return;
     }
     document.getElementById('ventHeight').value = height;
@@ -3305,19 +3333,18 @@ function handleVentilatorVoice(text, params) {
     document.querySelector('#ventMethodTabs .vent-tab[data-tab="height"]')?.click();
     calculateVentTV();
     showVoiceResult('حجم جاری ونتیلاتور محاسبه شد', 'success');
-    switchTab('tools');
-    setTimeout(() => openAccordionById('ventilatorAccordionItem'), 300);
 }
-
 // ---- Nutrition ----
 function handleNutritionVoice(text, params) {
+    switchTab('tools');
+    setTimeout(() => openAccordionById('nutritionAccordionItem'), 300);
+
     const weight = params.weight || 0;
     const height = params.height || 0;
     const age = params.age || 0;
     const gender = params.gender || 'male';
     if (!weight || !height || !age) {
         showVoiceResult('لطفاً وزن، قد و سن را وارد کنید (مثال: تغذیه وزن ۷۰ قد ۱۷۵ سن ۵۰ مرد)', 'error');
-        switchTab('tools');
         return;
     }
     document.getElementById('nutWeight').value = weight;
@@ -3332,25 +3359,23 @@ function handleNutritionVoice(text, params) {
     else document.getElementById('nutStress').value = '1.2';
     calculateNutrition();
     showVoiceResult('نیاز تغذیه‌ای محاسبه شد', 'success');
-    switchTab('tools');
-    setTimeout(() => openAccordionById('nutritionAccordionItem'), 300);
 }
 
 // ---- Y-Site ----
 function handleYSiteVoice(text, params) {
+    switchTab('tools');
+    setTimeout(() => openAccordionById('ysiteAccordionItem'), 300);
+
     const d1 = params.drug1 || params.drugId;
     const d2 = params.drug2 || findDrugName(text.replace(d1, ''));
     if (!d1 || !d2) {
         showVoiceResult('لطفاً دو دارو را برای بررسی سازگاری وارد کنید (مثال: سازگاری هپارین و وانکومایسین)', 'error');
-        switchTab('tools');
         return;
     }
     document.querySelectorAll('#ysiteDrugGrid .ysite-drug-chip').forEach(chip => {
         if (chip.dataset.id === d1 || chip.dataset.id === d2) chip.click();
     });
     showVoiceResult(`سازگاری ${drugDatabase[d1]?.persianName} و ${drugDatabase[d2]?.persianName} بررسی شد`, 'success');
-    switchTab('tools');
-    setTimeout(() => openAccordionById('ysiteAccordionItem'), 300);
 }
 // ---- findDrugName, extractNumberSimple, etc. ----
 function findDrugName(text) {
