@@ -2082,63 +2082,6 @@ window.stopVoice = function() {
     }
 };
 
-// Also update showVoiceResult to use the new result area and status
-const originalShowVoiceResult = window.showVoiceResult || function() {};
-window.showVoiceResult = function(message, type = 'success') {
-    const resultEl = voiceResultEl;
-    if (!resultEl) return;
-    resultEl.style.display = 'block';
-    resultEl.className = 'voice-result' + (type === 'error' ? ' error' : '');
-    // Use innerHTML to allow formatting
-    resultEl.innerHTML = message;
-    if (voiceStatusEl) {
-        voiceStatusEl.textContent = type === 'error' ? 'خطا' : 'انجام شد';
-        voiceStatusEl.className = 'voice-status' + (type === 'error' ? ' error' : ' success');
-    }
-    clearTimeout(voiceTimer);
-    voiceTimer = setTimeout(() => {
-        resultEl.style.display = 'none';
-    }, 12000);
-};
-
-// --- Update renderHistory to use the new history list container ---
-const originalRenderHistory = window.renderHistory || function() {};
-window.renderHistory = function() {
-    const container = document.getElementById('voiceHistoryList');
-    const historyWrap = document.getElementById('voiceHistory');
-    if (!container) return;
-    if (voiceHistory.length === 0) {
-        if (historyWrap) historyWrap.style.display = 'none';
-        return;
-    }
-    if (historyWrap) historyWrap.style.display = 'block';
-    container.innerHTML = voiceHistory.map(cmd =>
-        `<span class="voice-history-chip" data-cmd="${cmd}">${cmd}</span>`
-    ).join('');
-    container.querySelectorAll('.voice-history-chip').forEach(chip => {
-        chip.addEventListener('click', function() {
-            processTextInput(this.dataset.cmd);
-        });
-    });
-};
-
-// --- Also ensure processTextInput uses the new UI ---
-const originalProcessTextInput = window.processTextInput || function() {};
-window.processTextInput = function(text) {
-    if (!text) return;
-    addToHistory(text);
-    if (voiceTranscriptEl) {
-        voiceTranscriptEl.textContent = text;
-        voiceTranscriptEl.classList.add('active');
-    }
-    if (voiceStatusEl) {
-        voiceStatusEl.textContent = 'در حال پردازش...';
-        voiceStatusEl.className = 'voice-status processing';
-    }
-    // Process
-    processVoiceCommand(text);
-};
-
 // ============================================
 // COMMAND HISTORY
 // ============================================
