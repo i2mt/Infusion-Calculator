@@ -2156,13 +2156,23 @@ function setupVoiceTab() {
         voiceMicBtn.parentNode.replaceChild(newBtn, voiceMicBtn);
         voiceMicBtn = newBtn;
 
-        voiceMicBtn.addEventListener('click', function() {
-            if (voiceActive) {
-                stopVoice();
-            } else {
-                startVoice();
-            }
-        });
+        vvoiceMicBtn.addEventListener('click', function() {
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+
+    if (voiceActive) {
+        if (isIOS) {
+            stopVosk();
+        } else {
+            stopVoice();
+        }
+    } else {
+        if (isIOS) {
+            startVosk();
+        } else {
+            startVoice();
+        }
+    }
+});
     }
 
     // --- Example chips ---
@@ -2373,7 +2383,136 @@ window.startVoice = function() {
             stopVoice();
         }
     }
+// ============================================
+// VOSK OFFLINE RECOGNITION (iOS ONLY)
+// ============================================
 
+let voskRecognizer = null;
+let voskAudioContext = null;
+let voskProcessor = null;
+let voskInterval = null;
+let voskModel = null;
+let voskLoading = false;
+
+const VOSK_MODEL_URL = 'https://alphacephei.com/vosk/models/vosk-model-small-fa-0.5.zip';
+
+async function startVosk() {
+    if (voiceActive) return;
+    if (voskLoading) {
+        showToast('در حال بارگذاری', 'مدل صوتی در حال آماده‌سازی... لطفاً صبر کنید.', 'info');
+        return;
+    }
+
+    if (typeof Vosk === 'undefined') {
+        showToast('خطا', 'کتابخانه Vosk بارگذاری نشد', 'error');
+        return;
+    }
+
+    try {
+        voskLoading = true;
+        showToast('در حال بارگذاری', 'مدل صوتی در حال دانلود... (حدود ۳۰ مگابایت)', 'info');
+
+        voskModel = await Vosk.createModel(VOSK_MODEL_URL);
+        voskRecognizer = new Vosk.Recognizer(voskModel, 16000);
+
+        voskLoading = false;
+        showToast('آماده', 'مدل صوتی بارگذاری شد.', 'success');
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        voskAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = voskAudioContext.createMediaStreamSource(stream);
+
+        voskProcessor = voskAudioContext.createScriptProcessor(4096, 1, 1);
+        source.connect(voskProcessor);
+        voskProcessor.connect(voskAudioContext.destination);
+
+        let lastResult = '';
+        voskProcessor.onaudioprocess = (event) => {
+            const inputData = event.inputBuffer.getChannelData(0);
+            if (voskRecognizer) {
+                voskRecognizer.acceptWaveform(inputData);
+            }
+        };
+
+        voskInterval = setInterval(() => {
+            if (!voskRecognizer) {
+                clearInterval(voskInterval);
+                return;
+            }
+            const result = voskRecognizer.result();
+            if (result && result.text) {
+                const text = result.text.trim();
+                if (text && text !== lastResult) {
+                    lastResult = text;
+                    if (voiceTranscriptEl) {
+                        voiceTranscriptEl.textContent = text;
+                        voiceTranscriptEl.classList.add('active');
+                    }
+                    if (result.final) {
+                        stopVosk();
+                        addToHistory(text);
+                        processVoiceCommand(text);
+                    }
+                }
+            }
+        }, 250);
+
+        voiceActive = true;
+        voiceMicBtn.classList.add('recording');
+        const ring = document.querySelector('.voice-ring-container');
+        if (ring) ring.classList.add('recording');
+        const wave = document.getElementById('voiceWaveform');
+        if (wave) wave.classList.add('active');
+        if (voiceStatusEl) {
+            voiceStatusEl.textContent = 'گوش می‌کنم...';
+            voiceStatusEl.className = 'voice-status recording';
+        }
+        if (voiceTranscriptEl) {
+            voiceTranscriptEl.textContent = '';
+            voiceTranscriptEl.classList.remove('active');
+        }
+        if (voiceResultEl) {
+            voiceResultEl.style.display = 'none';
+            voiceResultEl.className = 'voice-result';
+            voiceResultEl.innerHTML = '';
+        }
+
+    } catch (e) {
+        console.error('Vosk error:', e);
+        voskLoading = false;
+        showToast('خطا', 'مشکل در راه‌اندازی Vosk: ' + e.message, 'error');
+        stopVosk();
+    }
+}
+
+function stopVosk() {
+    voiceActive = false;
+    if (voskInterval) {
+        clearInterval(voskInterval);
+        voskInterval = null;
+    }
+    if (voskProcessor) {
+        try { voskProcessor.disconnect(); } catch (e) {}
+        voskProcessor = null;
+    }
+    if (voskAudioContext) {
+        try { voskAudioContext.close(); } catch (e) {}
+        voskAudioContext = null;
+    }
+    if (voskRecognizer) {
+        try { voskRecognizer.close(); } catch (e) {}
+        voskRecognizer = null;
+    }
+    voiceMicBtn.classList.remove('recording');
+    const ring = document.querySelector('.voice-ring-container');
+    if (ring) ring.classList.remove('recording');
+    const wave = document.getElementById('voiceWaveform');
+    if (wave) wave.classList.remove('active');
+    if (voiceStatusEl && !voiceStatusEl.textContent.includes('پردازش')) {
+        voiceStatusEl.textContent = 'برای شروع، دکمه را بزنید';
+        voiceStatusEl.className = 'voice-status';
+    }
+}
     // --- Request microphone permission first (required for iOS) ---
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ audio: true })
