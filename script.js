@@ -2247,18 +2247,9 @@ function setupVoiceTab() {
 
 // Override the global startVoice with enhanced version that includes ring/waveform
 const originalStartVoice = window.startVoice || function() {};
-window.startVoice = async function() {
+window.startVoice = function() {
     if (voiceActive) return;
 
-    // Request microphone permission (required for iOS)
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-            await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (e) {
-            showToast('خطا', 'دسترسی به میکروفون داده نشد', 'error');
-            return;
-        }
-    }
     // Lazy init recognition (same as original)
     if (!recognition) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2272,44 +2263,45 @@ window.startVoice = async function() {
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
 
-        let finalTranscript = '';
         recognition.onresult = function(event) {
-    let interim = '';
-    let finalTranscript = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-        } else {
-            interim += transcript;
-        }
-    }
-    const displayText = finalTranscript || interim;
-    if (voiceTranscriptEl) {
-        voiceTranscriptEl.textContent = displayText || '...';
-        voiceTranscriptEl.classList.add('active');
-    }
-    if (voiceStatusEl) {
-        voiceStatusEl.textContent = finalTranscript ? 'در حال پردازش...' : 'گوش می‌کنم...';
-        voiceStatusEl.className = 'voice-status processing';
-    }
-    if (event.results[event.results.length - 1].isFinal) {
-        const command = finalTranscript.trim();
-        if (command) {
-            // Directly process the voice command (skip processTextInput double-call)
-            addToHistory(command);
-            processVoiceCommand(command);
-        }
-        finalTranscript = '';
-        stopVoice();
-    }
-};
+            let interim = '';
+            let finalTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interim += transcript;
+                }
+            }
+            const displayText = finalTranscript || interim;
+            if (voiceTranscriptEl) {
+                voiceTranscriptEl.textContent = displayText || '...';
+                voiceTranscriptEl.classList.add('active');
+            }
+            if (voiceStatusEl) {
+                voiceStatusEl.textContent = finalTranscript ? 'در حال پردازش...' : 'گوش می‌کنم...';
+                voiceStatusEl.className = 'voice-status processing';
+            }
+            if (event.results[event.results.length - 1].isFinal) {
+                const command = finalTranscript.trim();
+                if (command) {
+                    addToHistory(command);
+                    processVoiceCommand(command);
+                }
+                finalTranscript = '';
+                stopVoice();
+            }
+        };
 
         recognition.onerror = function(event) {
             console.warn('Voice error:', event.error);
             let msg = 'خطا در تشخیص صدا';
-            if (event.error === 'not-allowed') msg = 'دسترسی به میکروفون داده نشد';
-            else if (event.error === 'no-speech') msg = 'صدایی تشخیص داده نشد';
+            if (event.error === 'not-allowed') {
+                msg = 'دسترسی به میکروفون داده نشد';
+                // On iOS, remind user to allow microphone access
+                showToast('دسترسی', 'لطفاً در تنظیمات مرورگر، دسترسی میکروفون را فعال کنید.', 'warning');
+            } else if (event.error === 'no-speech') msg = 'صدایی تشخیص داده نشد';
             else if (event.error === 'audio-capture') msg = 'میکروفون در دسترس نیست';
             if (voiceStatusEl) {
                 voiceStatusEl.textContent = msg;
@@ -2347,8 +2339,13 @@ window.startVoice = async function() {
         recognition.start();
     } catch (e) {
         console.warn('Voice start error:', e);
-        showToast('خطا', 'دسترسی به میکروفون داده نشد یا مشکلی وجود دارد', 'error');
-        stopVoice();
+        // If start fails, try to restart after a short delay (iOS workaround)
+        if (e.message && e.message.includes('already started')) {
+            // ignore
+        } else {
+            showToast('خطا', 'دسترسی به میکروفون داده نشد یا مشکلی وجود دارد', 'error');
+            stopVoice();
+        }
     }
 };
 
