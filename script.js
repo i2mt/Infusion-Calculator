@@ -1829,7 +1829,223 @@ function processTextInput(text) {
     }
     processVoiceCommand(text);
 }
+// ---- Execute command ----
+function executeCommand(cmd, text, params) {
+    lastCommand = cmd;
+    lastParams = params;
 
+    switch (cmd) {
+            case 'history':
+    loadHistory();
+    if (DOM.historyModal) {
+        DOM.historyModal.classList.add('active');
+        document.body.classList.add('no-scroll');
+    }
+    showVoiceResult('تاریخچه محاسبات باز شد', 'success');
+    break;
+        case 'help':
+            showVoiceResult('دستورات نمونه: "هپارین ۱۲ واحد/کیلوگرم/ساعت وزن ۷۰", "BMI وزن ۷۵ قد ۱۷۵", "قطره ۵۰۰ میلی‌لیتر در ۸ ساعت", "تبدیل ۲۰ mEq سدیم به mg", "GCS 4 5 6", "سوختگی", "اکسیژن ۵ لیتر فشار ۱۵۰ بار جریان ۴", "تغذیه وزن ۷۰ قد ۱۷۵ سن ۵۰", "سازگاری هپارین و وانکومایسین", "تاریک", "فونت بزرگ"', 'info');
+            break;
+        case 'reverse':
+            AppState.reverseMode = !AppState.reverseMode;
+            updateReverseUI();
+            showVoiceResult(AppState.reverseMode ? 'حالت معکوس فعال شد' : 'حالت معکوس غیرفعال شد', 'info');
+            break;
+        case 'drug':
+            handleDrugVoice(text, params);
+            break;
+        case 'bmi':
+            handleBMIVoice(params);
+            break;
+        case 'bsa':
+            handleBSAVoice(params);
+            break;
+        case 'crcl':
+            handleCrClVoice(params);
+            break;
+        case 'drip':
+            handleDripRateVoice(params);
+            break;
+        case 'convert':
+            handleConvertVoice(text, params);
+            break;
+        case 'gcs':
+            handleGCSVoice(text, params);
+            break;
+        case 'rass':
+            handleRASSVoice(text, params);
+            break;
+        case 'braden':
+            handleBradenVoice(params);
+            break;
+        case 'morse':
+            handleMorseVoice(params);
+            break;
+        case 'burns':
+            handleBurnsVoice(text);
+            break;
+        case 'oxygen':
+            handleOxygenVoice(params);
+            break;
+        case 'vbg':
+            handleVBGVoice(text, params);
+            break;
+        case 'ventilator':
+            handleVentilatorVoice(text, params);
+            break;
+        case 'nutrition':
+            handleNutritionVoice(text, params);
+            break;
+        case 'ysite':
+            handleYSiteVoice(text, params);
+            break;
+            case 'druginfo':
+    handleDrugInfo(text, params);
+    break;
+            case 'tab_calculator':
+    switchTab('calculator');
+    showVoiceResult('بخش ماشین حساب باز شد', 'success');
+    break;
+
+case 'tab_drugs':
+    switchTab('drugs');
+    showVoiceResult('مرجع داروها باز شد', 'success');
+    break;
+
+case 'tab_tools':
+    switchTab('tools');
+    showVoiceResult('ابزارهای بالینی باز شد', 'success');
+    break;
+
+case 'clear':
+    clearResults();
+    showVoiceResult('نتایج پاک شد', 'success');
+    break;
+
+case 'manual_calc':
+    openManualCalculation();
+    showVoiceResult('محاسبه دستی باز شد', 'success');
+    break;
+            
+case 'ibw':
+    // Switch to tools tab and scroll to IBW
+    switchTab('tools');
+    setTimeout(() => {
+        calculateIBW();
+        openAccordionForTool('ibwResult', 'ibwAccordionItem');
+    }, 300);
+    showVoiceResult('وزن ایده‌آل محاسبه شد', 'success');
+    break;
+case 'manual_calc':
+    openManualCalculation();
+    // Ensure we are on calculator tab
+    switchTab('calculator');
+    showVoiceResult('محاسبه دستی باز شد', 'success');
+    break;
+case 'electrolyte':
+    switchTab('tools');
+    setTimeout(() => {
+        convertElectrolyteLive('meq');
+        openAccordionForTool('electrolyteResult', 'electrolyteAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل الکترولیت انجام شد', 'success');
+    break;
+
+case 'percentage':
+    switchTab('tools');
+    setTimeout(() => {
+        convertPercentageLive();
+        openAccordionForTool('percentageResult', 'percentageAccordionItem');
+    }, 300);
+    showVoiceResult('غلظت درصد محاسبه شد', 'success');
+    break;
+
+case 'unit_convert':
+    switchTab('tools');
+    setTimeout(() => {
+        convertUnitsLive('from');
+        openAccordionForTool('unitResult', 'unitAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل واحد انجام شد', 'success');
+    break;
+
+case 'temp_convert':
+    switchTab('tools');
+    setTimeout(() => {
+        convertTempLive('c');
+        openAccordionForTool('tempResult', 'tempAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل دما انجام شد', 'success');
+    break;
+
+case 'weight_convert':
+    switchTab('tools');
+    setTimeout(() => {
+        convertWeightLive('kg');
+        openAccordionForTool('weightResult', 'weightAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل وزن انجام شد', 'success');
+    break;
+
+case 'dose_calc':
+    switchTab('tools');
+    setTimeout(() => {
+        populateDoseCalcFromDrug();
+        calculateDose();
+        // remove the broken openAccordionForTool
+    }, 300);
+    showVoiceResult('محاسبه دوز انجام شد', 'success');
+    break;
+
+case 'compat_tool':
+    switchTab('tools');
+    setTimeout(() => {
+        checkCompatibility();
+        // remove the broken openAccordionForTool
+    }, 300);
+    showVoiceResult('بررسی سازگاری انجام شد', 'success');
+    break;
+
+case 'theme':
+    // This should already be caught by the early theme check, but as a fallback:
+    const themeMap = {
+        'fox': 'fox', 'فاکس': 'fox',
+        'ocean': 'ocean', 'اقیانوس': 'ocean',
+        'rose': 'rose', 'رز': 'rose',
+        'forest': 'forest', 'جنگل': 'forest',
+        'default': 'default', 'پیش‌فرض': 'default'
+    };
+    const lowerText = text.toLowerCase();
+    let foundTheme = null;
+    for (const [key, val] of Object.entries(themeMap)) {
+        if (lowerText.includes(key)) {
+            foundTheme = val;
+            break;
+        }
+    }
+    if (foundTheme) {
+        AppState.settings.colorTheme = foundTheme;
+        saveSettings();
+        applyTheme(foundTheme);
+        showVoiceResult(`تم ${foundTheme} فعال شد`, 'success');
+    } else {
+        showVoiceResult('تم شناسایی نشد', 'error');
+    }
+    break;
+        default:
+            showVoiceResult('این دستور هنوز پشتیبانی نمی‌شود.', 'error');
+    }
+    // Show tip if available
+    const tip = TIPS[cmd];
+    if (tip) {
+        setTimeout(() => {
+            if (voiceResultEl) {
+                voiceResultEl.innerHTML += `<div class="voice-tip" style="margin-top:8px;font-size:12px;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:6px;">${tip}</div>`;
+            }
+        }, 1500);
+    }
+}
+}
 // ============================================
 // HELPER: Open accordion by ID (for voice redirect)
 // ============================================
@@ -2659,223 +2875,7 @@ const cmd = best[0];
 // No confirmation – execute immediately
 executeCommand(cmd, normalized, params);
 
-// ---- Execute command ----
-function executeCommand(cmd, text, params) {
-    lastCommand = cmd;
-    lastParams = params;
 
-    switch (cmd) {
-            case 'history':
-    loadHistory();
-    if (DOM.historyModal) {
-        DOM.historyModal.classList.add('active');
-        document.body.classList.add('no-scroll');
-    }
-    showVoiceResult('تاریخچه محاسبات باز شد', 'success');
-    break;
-        case 'help':
-            showVoiceResult('دستورات نمونه: "هپارین ۱۲ واحد/کیلوگرم/ساعت وزن ۷۰", "BMI وزن ۷۵ قد ۱۷۵", "قطره ۵۰۰ میلی‌لیتر در ۸ ساعت", "تبدیل ۲۰ mEq سدیم به mg", "GCS 4 5 6", "سوختگی", "اکسیژن ۵ لیتر فشار ۱۵۰ بار جریان ۴", "تغذیه وزن ۷۰ قد ۱۷۵ سن ۵۰", "سازگاری هپارین و وانکومایسین", "تاریک", "فونت بزرگ"', 'info');
-            break;
-        case 'reverse':
-            AppState.reverseMode = !AppState.reverseMode;
-            updateReverseUI();
-            showVoiceResult(AppState.reverseMode ? 'حالت معکوس فعال شد' : 'حالت معکوس غیرفعال شد', 'info');
-            break;
-        case 'drug':
-            handleDrugVoice(text, params);
-            break;
-        case 'bmi':
-            handleBMIVoice(params);
-            break;
-        case 'bsa':
-            handleBSAVoice(params);
-            break;
-        case 'crcl':
-            handleCrClVoice(params);
-            break;
-        case 'drip':
-            handleDripRateVoice(params);
-            break;
-        case 'convert':
-            handleConvertVoice(text, params);
-            break;
-        case 'gcs':
-            handleGCSVoice(text, params);
-            break;
-        case 'rass':
-            handleRASSVoice(text, params);
-            break;
-        case 'braden':
-            handleBradenVoice(params);
-            break;
-        case 'morse':
-            handleMorseVoice(params);
-            break;
-        case 'burns':
-            handleBurnsVoice(text);
-            break;
-        case 'oxygen':
-            handleOxygenVoice(params);
-            break;
-        case 'vbg':
-            handleVBGVoice(text, params);
-            break;
-        case 'ventilator':
-            handleVentilatorVoice(text, params);
-            break;
-        case 'nutrition':
-            handleNutritionVoice(text, params);
-            break;
-        case 'ysite':
-            handleYSiteVoice(text, params);
-            break;
-            case 'druginfo':
-    handleDrugInfo(text, params);
-    break;
-            case 'tab_calculator':
-    switchTab('calculator');
-    showVoiceResult('بخش ماشین حساب باز شد', 'success');
-    break;
-
-case 'tab_drugs':
-    switchTab('drugs');
-    showVoiceResult('مرجع داروها باز شد', 'success');
-    break;
-
-case 'tab_tools':
-    switchTab('tools');
-    showVoiceResult('ابزارهای بالینی باز شد', 'success');
-    break;
-
-case 'clear':
-    clearResults();
-    showVoiceResult('نتایج پاک شد', 'success');
-    break;
-
-case 'manual_calc':
-    openManualCalculation();
-    showVoiceResult('محاسبه دستی باز شد', 'success');
-    break;
-            
-case 'ibw':
-    // Switch to tools tab and scroll to IBW
-    switchTab('tools');
-    setTimeout(() => {
-        calculateIBW();
-        openAccordionForTool('ibwResult', 'ibwAccordionItem');
-    }, 300);
-    showVoiceResult('وزن ایده‌آل محاسبه شد', 'success');
-    break;
-case 'manual_calc':
-    openManualCalculation();
-    // Ensure we are on calculator tab
-    switchTab('calculator');
-    showVoiceResult('محاسبه دستی باز شد', 'success');
-    break;
-case 'electrolyte':
-    switchTab('tools');
-    setTimeout(() => {
-        convertElectrolyteLive('meq');
-        openAccordionForTool('electrolyteResult', 'electrolyteAccordionItem');
-    }, 300);
-    showVoiceResult('تبدیل الکترولیت انجام شد', 'success');
-    break;
-
-case 'percentage':
-    switchTab('tools');
-    setTimeout(() => {
-        convertPercentageLive();
-        openAccordionForTool('percentageResult', 'percentageAccordionItem');
-    }, 300);
-    showVoiceResult('غلظت درصد محاسبه شد', 'success');
-    break;
-
-case 'unit_convert':
-    switchTab('tools');
-    setTimeout(() => {
-        convertUnitsLive('from');
-        openAccordionForTool('unitResult', 'unitAccordionItem');
-    }, 300);
-    showVoiceResult('تبدیل واحد انجام شد', 'success');
-    break;
-
-case 'temp_convert':
-    switchTab('tools');
-    setTimeout(() => {
-        convertTempLive('c');
-        openAccordionForTool('tempResult', 'tempAccordionItem');
-    }, 300);
-    showVoiceResult('تبدیل دما انجام شد', 'success');
-    break;
-
-case 'weight_convert':
-    switchTab('tools');
-    setTimeout(() => {
-        convertWeightLive('kg');
-        openAccordionForTool('weightResult', 'weightAccordionItem');
-    }, 300);
-    showVoiceResult('تبدیل وزن انجام شد', 'success');
-    break;
-
-case 'dose_calc':
-    switchTab('tools');
-    setTimeout(() => {
-        populateDoseCalcFromDrug();
-        calculateDose();
-        // remove the broken openAccordionForTool
-    }, 300);
-    showVoiceResult('محاسبه دوز انجام شد', 'success');
-    break;
-
-case 'compat_tool':
-    switchTab('tools');
-    setTimeout(() => {
-        checkCompatibility();
-        // remove the broken openAccordionForTool
-    }, 300);
-    showVoiceResult('بررسی سازگاری انجام شد', 'success');
-    break;
-
-case 'theme':
-    // This should already be caught by the early theme check, but as a fallback:
-    const themeMap = {
-        'fox': 'fox', 'فاکس': 'fox',
-        'ocean': 'ocean', 'اقیانوس': 'ocean',
-        'rose': 'rose', 'رز': 'rose',
-        'forest': 'forest', 'جنگل': 'forest',
-        'default': 'default', 'پیش‌فرض': 'default'
-    };
-    const lowerText = text.toLowerCase();
-    let foundTheme = null;
-    for (const [key, val] of Object.entries(themeMap)) {
-        if (lowerText.includes(key)) {
-            foundTheme = val;
-            break;
-        }
-    }
-    if (foundTheme) {
-        AppState.settings.colorTheme = foundTheme;
-        saveSettings();
-        applyTheme(foundTheme);
-        showVoiceResult(`تم ${foundTheme} فعال شد`, 'success');
-    } else {
-        showVoiceResult('تم شناسایی نشد', 'error');
-    }
-    break;
-        default:
-            showVoiceResult('این دستور هنوز پشتیبانی نمی‌شود.', 'error');
-    }
-    // Show tip if available
-    const tip = TIPS[cmd];
-    if (tip) {
-        setTimeout(() => {
-            if (voiceResultEl) {
-                voiceResultEl.innerHTML += `<div class="voice-tip" style="margin-top:8px;font-size:12px;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:6px;">${tip}</div>`;
-            }
-        }, 1500);
-    }
-}
-}
 // ============================================
 // HANDLER FUNCTIONS (implement all tools)
 // ============================================
