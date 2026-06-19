@@ -2250,11 +2250,18 @@ const originalStartVoice = window.startVoice || function() {};
 window.startVoice = function() {
     if (voiceActive) return;
 
-    // --- iOS: request microphone permission first ---
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+
+    // On iOS, skip getUserMedia – Safari handles permission internally
+    if (isIOS) {
+        startRecognition();
+        return;
+    }
+
+    // Android: request mic permission via getUserMedia first
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(function(stream) {
-                // Keep the stream alive to prevent iOS from releasing the mic
                 if (!window._audioStream) {
                     window._audioStream = stream;
                 }
@@ -2265,12 +2272,10 @@ window.startVoice = function() {
             })
             .catch(function(err) {
                 console.warn('Microphone permission error:', err);
-                showToast('خطا', 'دسترسی به میکروفون داده نشد. لطفاً در تنظیمات مرورگر فعال کنید.', 'error');
-                // Still try to start recognition – maybe it works without permission (Android)
-                startRecognition();
+                showToast('توجه', 'دسترسی به میکروفون داده نشد. لطفاً در تنظیمات مرورگر فعال کنید.', 'warning');
+                startRecognition(); // still try
             });
     } else {
-        // No getUserMedia – just try recognition directly
         startRecognition();
     }
 
@@ -2285,10 +2290,11 @@ window.startVoice = function() {
             return;
         }
 
-        // Create a new recognition instance (recreate if previously stopped)
+        // Create a new recognition instance
         recognition = new SpeechRecognition();
         recognition.lang = 'fa-IR';
-        recognition.continuous = true;   // Keep listening until stopVoice() is called
+        // iOS works better with continuous: false
+        recognition.continuous = !isIOS;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
 
@@ -2313,7 +2319,6 @@ window.startVoice = function() {
                 voiceStatusEl.textContent = finalTranscript ? 'در حال پردازش...' : 'گوش می‌کنم...';
                 voiceStatusEl.className = 'voice-status processing';
             }
-            // If we have a final result, process it and stop listening
             if (finalTranscript.trim()) {
                 const command = finalTranscript.trim();
                 addToHistory(command);
@@ -2328,20 +2333,28 @@ window.startVoice = function() {
             let msg = 'خطا در تشخیص صدا';
             let detail = '';
 
-            if (event.error === 'not-allowed') {
-                msg = 'دسترسی به میکروفون داده نشد';
-                detail = 'لطفاً در تنظیمات مرورگر، دسترسی میکروفون را فعال کنید.';
-            } else if (event.error === 'no-speech') {
-                msg = 'صدایی تشخیص داده نشد';
-                detail = 'لطفاً واضح‌تر صحبت کنید.';
-            } else if (event.error === 'audio-capture') {
-                msg = 'میکروفون در دسترس نیست';
-                detail = 'مطمئن شوید میکروفون به دستگاه متصل است.';
-            } else if (event.error === 'aborted') {
-                // Ignore – this is usually caused by stopVoice() being called
-                return;
-            } else {
-                detail = event.error;
+            switch (event.error) {
+                case 'not-allowed':
+                    msg = 'دسترسی به میکروفون داده نشد';
+                    detail = 'لطفاً در تنظیمات مرورگر، دسترسی میکروفون را فعال کنید.';
+                    break;
+                case 'service-not-allowed':
+                    msg = 'سرویس تشخیص صدا در دسترس نیست';
+                    detail = 'لطفاً از Safari استفاده کنید و مطمئن شوید که دسترسی میکروفون فعال است.';
+                    break;
+                case 'no-speech':
+                    msg = 'صدایی تشخیص داده نشد';
+                    detail = 'لطفاً واضح‌تر صحبت کنید.';
+                    break;
+                case 'audio-capture':
+                    msg = 'میکروفون در دسترس نیست';
+                    detail = 'مطمئن شوید میکروفون به دستگاه متصل است.';
+                    break;
+                case 'aborted':
+                    // Ignore – usually from stopVoice()
+                    return;
+                default:
+                    detail = event.error;
             }
 
             if (voiceStatusEl) {
@@ -2353,8 +2366,8 @@ window.startVoice = function() {
         };
 
         recognition.onend = function() {
-            // If we're still supposed to be active, restart (iOS sometimes ends early)
-            if (voiceActive) {
+            // If we're still supposed to be active and we're on Android, restart
+            if (voiceActive && !isIOS) {
                 try {
                     recognition.start();
                 } catch (e) {
