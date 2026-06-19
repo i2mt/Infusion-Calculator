@@ -3036,6 +3036,7 @@ function handleDrugVoice(text, params) {
         console.error('Calculation error:', e);
         showVoiceResult('خطا در محاسبه: ' + e.message, 'error');
     }
+}
 // Also if user explicitly said method, it overrides
 // (already handled by the existing code)
    
