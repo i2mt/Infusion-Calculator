@@ -2369,7 +2369,7 @@ if (heightFallback && !params.height) {
 const COMMAND_KEYWORDS = {
     // ── Navigation ────────────────────────────────────────────────
     tab_calculator: {
-        triggers: ['ماشین حساب', 'محاسبه‌گر', 'تب محاسبه', 'برگه محاسبه', 'بخش محاسبه', 'calculator tab', 'go to calculator', 'ماشین‌حساب'],
+        triggers: ['ماشین حساب', 'calculator tab', 'go to calculator', 'ماشین‌حساب'],
         scoreWeight: 0.7
     },
     tab_drugs: {
@@ -2493,7 +2493,7 @@ const COMMAND_KEYWORDS = {
         scoreWeight: 0.9
     },
     dose_calc: {
-        triggers: ['محاسبه دوز', 'دوز دارو', 'حجم ویال', 'dose calculation', 'vial', 'حجم تزریقی', 'مقدار مصرف دارو'],
+        triggers: [' دوز', 'دوز دارو', 'حجم ویال', 'dose calculation', 'vial', 'حجم تزریقی', 'مقدار مصرف دارو'],
         scoreWeight: 0.9
     },
     compat_tool: {
