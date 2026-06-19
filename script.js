@@ -2917,6 +2917,34 @@ if (lower.includes('small font') || lower.includes('فونت کوچک') || lower
     showVoiceResult('فونت معمولی فعال شد', 'success');
     return;
 }
+    // ---- Convert Persian number words to digits ----
+let textWithDigits = normalized;
+const numberWords = {
+    'یک': '1', 'دو': '2', 'سه': '3', 'چهار': '4', 'پنج': '5',
+    'شش': '6', 'هفت': '7', 'هشت': '8', 'نه': '9', 'ده': '10',
+    'یازده': '11', 'دوازده': '12', 'سیزده': '13', 'چهارده': '14', 'پانزده': '15',
+    'شانزده': '16', 'هفده': '17', 'هجده': '18', 'نوزده': '19', 'بیست': '20',
+    'سی': '30', 'چهل': '40', 'پنجاه': '50', 'شصت': '60', 'هفتاد': '70', 'هشتاد': '80', 'نود': '90', 'صد': '100'
+};
+for (const [word, digit] of Object.entries(numberWords)) {
+    textWithDigits = textWithDigits.replace(new RegExp('\\b' + word + '\\b', 'g'), digit);
+}
+
+// ---- Convert Persian unit names to Latin ----
+const unitMap = {
+    'میلی گرم': 'mg',
+    'میلی‌گرم': 'mg',
+    'میکرو گرم': 'mcg',
+    'میکروگرم': 'mcg',
+    'گرم': 'g',
+    'واحد': 'units',
+};
+for (const [persian, latin] of Object.entries(unitMap)) {
+    textWithDigits = textWithDigits.replace(new RegExp(persian, 'g'), latin);
+}
+
+// Now use textWithDigits instead of normalized
+const params = extractParams(textWithDigits);
     // ---- Extract params ----
     const params = extractParams(normalized);
 
