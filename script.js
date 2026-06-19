@@ -2156,7 +2156,7 @@ function setupVoiceTab() {
         voiceMicBtn.parentNode.replaceChild(newBtn, voiceMicBtn);
         voiceMicBtn = newBtn;
 
-        vvoiceMicBtn.addEventListener('click', function() {
+        voiceMicBtn.addEventListener('click', function() {
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
 
     if (voiceActive) {
