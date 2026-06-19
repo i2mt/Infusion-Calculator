@@ -2250,38 +2250,8 @@ const originalStartVoice = window.startVoice || function() {};
 window.startVoice = function() {
     if (voiceActive) return;
 
-    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-
-    // On iOS, skip getUserMedia – Safari handles permission internally
-    if (isIOS) {
-        startRecognition();
-        return;
-    }
-
-    // Android: request mic permission via getUserMedia first
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(function(stream) {
-                if (!window._audioStream) {
-                    window._audioStream = stream;
-                }
-                // Small delay to let the stream settle
-                setTimeout(function() {
-                    startRecognition();
-                }, 100);
-            })
-            .catch(function(err) {
-                console.warn('Microphone permission error:', err);
-                showToast('توجه', 'دسترسی به میکروفون داده نشد. لطفاً در تنظیمات مرورگر فعال کنید.', 'warning');
-                startRecognition(); // still try
-            });
-    } else {
-        startRecognition();
-    }
-
-    // --- Core recognition starter ---
+    // Function to actually start recognition
     function startRecognition() {
-        // If recognition already exists and is running, do nothing
         if (recognition && voiceActive) return;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2294,6 +2264,7 @@ window.startVoice = function() {
         recognition = new SpeechRecognition();
         recognition.lang = 'fa-IR';
         // iOS works better with continuous: false
+        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
         recognition.continuous = !isIOS;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
@@ -2323,7 +2294,6 @@ window.startVoice = function() {
                 const command = finalTranscript.trim();
                 addToHistory(command);
                 processVoiceCommand(command);
-                // Stop listening after a command is recognized
                 stopVoice();
             }
         };
@@ -2351,8 +2321,7 @@ window.startVoice = function() {
                     detail = 'مطمئن شوید میکروفون به دستگاه متصل است.';
                     break;
                 case 'aborted':
-                    // Ignore – usually from stopVoice()
-                    return;
+                    return; // ignore
                 default:
                     detail = event.error;
             }
@@ -2366,8 +2335,8 @@ window.startVoice = function() {
         };
 
         recognition.onend = function() {
-            // If we're still supposed to be active and we're on Android, restart
-            if (voiceActive && !isIOS) {
+            // On Android, restart if still active
+            if (voiceActive && !/iPhone|iPad|iPod/.test(navigator.userAgent)) {
                 try {
                     recognition.start();
                 } catch (e) {
@@ -2376,7 +2345,7 @@ window.startVoice = function() {
             }
         };
 
-        // --- Start recognition ---
+        // Start recognition
         try {
             recognition.start();
             voiceActive = true;
@@ -2403,6 +2372,28 @@ window.startVoice = function() {
             showToast('خطا', 'مشکلی در راه‌اندازی میکروفون وجود دارد.', 'error');
             stopVoice();
         }
+    }
+
+    // --- Request microphone permission first (required for iOS) ---
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(function(stream) {
+                // Keep stream alive to prevent iOS from releasing the mic
+                if (!window._audioStream) {
+                    window._audioStream = stream;
+                }
+                // Start recognition immediately (no setTimeout, preserve gesture)
+                startRecognition();
+            })
+            .catch(function(err) {
+                console.warn('Microphone permission error:', err);
+                // If permission denied, still try to start recognition (Android might work)
+                showToast('توجه', 'برای استفاده از میکروفون، لطفاً دسترسی را در تنظیمات مرورگر فعال کنید.', 'warning');
+                startRecognition();
+            });
+    } else {
+        // No getUserMedia – just try recognition directly
+        startRecognition();
     }
 };
 
