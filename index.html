@@ -118,10 +118,10 @@
                 <button class="icon-btn" id="settingsBtn" title="تنظیمات">
                     <i class="fas fa-cog"></i>
                 </button>
-				<div class="voice-indicator" id="voiceIndicator" style="display:none;">
-    <span class="voice-dot"></span>
-    <span class="voice-label">ضبط</span>
-</div>
+                <div class="voice-indicator" id="voiceIndicator" style="display:none;">
+                    <span class="voice-dot"></span>
+                    <span class="voice-label">ضبط</span>
+                </div>
             </div>
         </div>
     </header>
@@ -407,7 +407,7 @@
                             <span>ارزیابی بیمار</span>
                         </div>
                         <div class="accordion-list">
-                        <div class="accordion-item">
+                        <div class="accordion-item" id="gcsAccordionItem">
                             <button class="accordion-header" onclick="toggleAccordion(this)">
                                 <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#6366f1,#8b5cf6)"><i class="fas fa-brain"></i></div>
                                 <div class="accordion-title-wrap">
@@ -485,7 +485,7 @@
                         </div>
 
                         <!-- RASS -->
-                        <div class="accordion-item">
+                        <div class="accordion-item" id="rassAccordionItem">
                             <button class="accordion-header" onclick="toggleAccordion(this)">
                                 <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#0ea5e9,#6366f1)"><i class="fas fa-bed-pulse"></i></div>
                                 <div class="accordion-title-wrap">
@@ -579,7 +579,7 @@
                         </div>
 
                         <!-- Braden Scale -->
-                        <div class="accordion-item">
+                        <div class="accordion-item" id="bradenAccordionItem">
                             <button class="accordion-header" onclick="toggleAccordion(this)">
                                 <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#10b981,#0d9488)"><i class="fas fa-shield-heart"></i></div>
                                 <div class="accordion-title-wrap">
@@ -697,7 +697,7 @@
                         </div>
 
                         <!-- Morse Fall Scale -->
-                        <div class="accordion-item">
+                        <div class="accordion-item" id="morseAccordionItem">
                             <button class="accordion-header" onclick="toggleAccordion(this)">
                                 <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#f59e0b,#ef4444)"><i class="fas fa-person-falling"></i></div>
                                 <div class="accordion-title-wrap">
@@ -806,7 +806,7 @@
                         </div>
 
                         <!-- Oxygen Cylinder Calculator -->
-                        <div class="accordion-item">
+                        <div class="accordion-item" id="oxygenAccordionItem">
                             <button class="accordion-header" onclick="toggleAccordion(this)">
                                 <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#0ea5e9,#38bdf8)"><i class="fas fa-lungs"></i></div>
                                 <div class="accordion-title-wrap">
@@ -878,7 +878,7 @@
                         </div>
 
                         <!-- Burns TBSA -->
-                        <div class="accordion-item">
+                        <div class="accordion-item" id="burnsAccordionItem">
                             <button class="accordion-header" onclick="toggleAccordion(this)">
                                 <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#f97316,#ef4444)"><i class="fas fa-fire"></i></div>
                                 <div class="accordion-title-wrap">
@@ -975,7 +975,7 @@
                         </div>
                         <div class="accordion-list">
                             <!-- BMI -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="bmiAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#667eea,#764ba2)"><i class="fas fa-weight-scale"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1007,7 +1007,7 @@
                             </div>
 
                             <!-- Y-Site Compatibility Matrix -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="ysiteAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb)"><i class="fas fa-vials"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1031,7 +1031,7 @@
 
 
                             <!-- BSA -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="bsaAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#4facfe,#00f2fe)"><i class="fas fa-ruler-combined"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1071,7 +1071,7 @@
                             </div>
 
                             <!-- IBW -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="ibwAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#43e97b,#38f9d7)"><i class="fas fa-person"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1111,7 +1111,7 @@
                             </div>
 
                             <!-- Ventilator Tidal Volume -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="ventilatorAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#0ea5e9,#22d3ee)"><i class="fas fa-lungs-virus"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1181,7 +1181,7 @@
                             </div>
 
                             <!-- Nutritional Calculator -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="nutritionAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#f59e0b,#10b981)"><i class="fas fa-utensils"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1256,7 +1256,7 @@
                             </div>
 
                             <!-- VBG Interpreter -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="vbgAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#dc2626,#7c3aed)"><i class="fas fa-droplet"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1346,7 +1346,7 @@
                             </div>
 
                             <!-- CrCl -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="crclAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#fa709a,#fee140)">
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:block; margin:0 auto;">
@@ -1413,7 +1413,7 @@
                         </div>
                         <div class="accordion-list">
                             <!-- Drip Rate -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="dripAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#43e97b,#38f9d7)"><i class="fas fa-droplet"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1453,7 +1453,7 @@
                             </div>
 
                             <!-- Unit Converter -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="unitAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#667eea,#764ba2)"><i class="fas fa-balance-scale"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1487,7 +1487,7 @@
                             </div>
 
                             <!-- Electrolyte Converter -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="electrolyteAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#f093fb,#f5576c)"><i class="fas fa-bolt"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1523,7 +1523,7 @@
                             </div>
 
                             <!-- Percentage Converter -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="percentageAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#4facfe,#00f2fe)"><i class="fas fa-percent"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1554,7 +1554,7 @@
                             </div>
 
                             <!-- Temperature Converter -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="tempAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#fa709a,#fee140)"><i class="fas fa-temperature-half"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1580,7 +1580,7 @@
                             </div>
 
                             <!-- Weight Converter -->
-                            <div class="accordion-item">
+                            <div class="accordion-item" id="weightAccordionItem">
                                 <button class="accordion-header" onclick="toggleAccordion(this)">
                                     <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb)"><i class="fas fa-weight-hanging"></i></div>
                                     <div class="accordion-title-wrap">
@@ -1612,7 +1612,7 @@
                         </div>
 
                         <!-- Pressure Converter -->
-                        <div class="accordion-item">
+                        <div class="accordion-item" id="pressureAccordionItem">
                             <button class="accordion-header" onclick="toggleAccordion(this)">
                                 <div class="accordion-icon-wrap" style="background:linear-gradient(135deg,#0ea5e9,#6366f1)"><i class="fas fa-gauge"></i></div>
                                 <div class="accordion-title-wrap">
@@ -1667,7 +1667,7 @@
     <button class="voice-copy-btn" id="voiceCopyBtn" title="کپی متن"><i class="fas fa-copy"></i></button>
 </div>
             <div class="voice-result" id="voiceResult" style="display:none;"></div>
-			<!-- Command history -->
+            <!-- Command history -->
 <div class="voice-history" id="voiceHistory" style="display:none;">
     <div class="voice-history-header">
         <span><i class="fas fa-clock-rotate-left"></i> دستورات اخیر</span>
@@ -1694,6 +1694,8 @@
                 <button class="example-chip" data-command="BSA weight 70 height 170 mosteller">BSA وزن ۷۰ قد ۱۷۰ موستلر</button>
                 <button class="example-chip" data-command="creatinine clearance age 40 weight 70 creatinine 1.0 male">کلیرانس کراتینین سن ۴۰ وزن ۷۰ کراتینین ۱ مرد</button>
                 <button class="example-chip" data-command="convert 20 mEq sodium to mg">تبدیل ۲۰ mEq سدیم به mg</button>
+                <button class="example-chip" data-command="dark mode">حالت تاریک</button>
+                <button class="example-chip" data-command="light mode">حالت روشن</button>
             </div>
         </div>
     </div>
@@ -1705,7 +1707,7 @@
             <button class="tab-item active" data-tab="calculator"><i class="fas fa-calculator"></i><span>محاسبه</span></button>
             <button class="tab-item" data-tab="drugs"><i class="fas fa-book-medical"></i><span>مرجع</span></button>
             <button class="tab-item" data-tab="tools"><i class="fas fa-tools"></i><span>ابزارها</span></button>
-	    <button class="tab-item" data-tab="voice"><i class="fas fa-microphone"></i><span>دستیار</span></button>
+            <button class="tab-item" data-tab="voice"><i class="fas fa-microphone"></i><span>دستیار</span></button>
         </div>
     </div>
 
@@ -1975,7 +1977,7 @@
         <div class="help-popover-arrow"></div>
         <p class="help-popover-text" id="helpPopoverText"></p>
     </div>
-		<!-- Confirmation Overlay -->
+        <!-- Confirmation Overlay -->
 <div class="voice-confirm-overlay" id="voiceConfirmOverlay" style="display:none;">
     <div class="voice-confirm-box">
         <div class="voice-confirm-icon"><i class="fas fa-question-circle"></i></div>
