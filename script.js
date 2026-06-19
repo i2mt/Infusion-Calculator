@@ -2552,19 +2552,6 @@ function processVoiceCommand(text) {
     normalized = normalized.replace(/[،،]/g, ' ').replace(/\s+/g, ' ').trim();
     const lower = normalized.toLowerCase();
 
-    // === Theme color commands (fox, ocean, rose, forest, default) ===
-const themeNames = ['fox', 'ocean', 'rose', 'forest', 'default'];
-const persianTheme = { 'fox':'فاکس', 'ocean':'اقیانوس', 'rose':'رز', 'forest':'جنگل', 'default':'پیش‌فرض' };
-for (const theme of themeNames) {
-    if (lower.includes(theme) || lower.includes(persianTheme[theme])) {
-        AppState.settings.colorTheme = theme;
-        saveSettings();
-        applyTheme(theme);
-        showVoiceResult(`تم ${theme} فعال شد`, 'success');
-        return;
-    }
-}
-
 // === Dark / Light mode ===
 if (lower.includes('dark mode') || lower.includes('دارک') || lower.includes('تاریک') || lower.includes('حالت شب')) {
     AppState.settings.themeMode = 'dark';
@@ -2754,16 +2741,7 @@ case 'manual_calc':
     openManualCalculation();
     showVoiceResult('محاسبه دستی باز شد', 'success');
     break;
-
-case 'history':
-    loadHistory();
-    if (DOM.historyModal) {
-        DOM.historyModal.classList.add('active');
-        document.body.classList.add('no-scroll');
-    }
-    showVoiceResult('تاریخچه محاسبات باز شد', 'success');
-    break;
-
+            
 case 'ibw':
     // Switch to tools tab and scroll to IBW
     switchTab('tools');
