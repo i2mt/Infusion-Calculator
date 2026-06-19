@@ -2916,8 +2916,6 @@ for (const [persian, latin] of Object.entries(unitMap)) {
 
 // Now use textWithDigits instead of normalized
 const params = extractParams(textWithDigits);
-    // ---- Extract params ----
-    const params = extractParams(normalized);
 
     // ---- Drug info detection (early) ----
     const infoTriggers = ['اطلاعات', 'درباره', 'توضیح', 'شرح', 'کاربرد', 'مقدار مصرف', 'نحوه مصرف', 'چیه', 'چیست', 'info', 'about', 'describe'];
