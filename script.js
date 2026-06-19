@@ -732,7 +732,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     loadDrugGrid();
     selectDrug('heparin');
-    initCompatibilityDropdowns();
     loadDrugLibrary();
     initVoiceTab();
 });
@@ -1490,4 +1489,4 @@ function setupEventListeners() {
             e.stopPropagation(); // prevent row handler from firing again
             haptic(25);
             AppState.useWeight = !AppState.useWeight;
-            if (DOM.weightCheckbox) DOM.weightCheckbox.c
+            if (DOM.weightCheckbox) DOM.weightCheckbox.checked = AppState.useWeight;
