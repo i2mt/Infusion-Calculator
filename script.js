@@ -734,7 +734,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectDrug('heparin');
     initCompatibilityDropdowns();
     loadDrugLibrary();
-	initVoiceTab();
+    initVoiceTab();
 });
 
 function initializeApp() {
@@ -1780,6 +1780,42 @@ const TIPS = {
 };
 
 // ============================================
+// HELPER: Open accordion by ID (for voice redirect)
+// ============================================
+function openAccordionById(itemId) {
+    const item = document.getElementById(itemId);
+    if (!item) return;
+    // If already open, do nothing
+    if (item.classList.contains('open')) return;
+
+    // Close any other open accordion
+    document.querySelectorAll('.accordion-item.open').forEach(openItem => {
+        if (openItem !== item) {
+            openItem.classList.remove('open');
+            const body = openItem.querySelector('.accordion-body');
+            if (body) {
+                body.style.maxHeight = '0';
+                body.style.padding = '0';
+            }
+            const chev = openItem.querySelector('.accordion-chevron');
+            if (chev) chev.style.transform = '';
+        }
+    });
+
+    // Open this one
+    item.classList.add('open');
+    const body = item.querySelector('.accordion-body');
+    if (body) {
+        body.style.maxHeight = body.scrollHeight + 2000 + 'px';
+        body.style.padding = '0 0 14px';
+    }
+    const chevron = item.querySelector('.accordion-chevron');
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+    haptic(20);
+    setTimeout(() => item.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+}
+
+// ============================================
 // INITIALISE VOICE TAB (Lazy)
 // ============================================
 function setupVoiceTab() {
@@ -1801,10 +1837,10 @@ function setupVoiceTab() {
     // --- History ---
     renderHistory();
     document.getElementById('voiceClearHistoryBtn')?.addEventListener('click', () => {
-    voiceHistory = [];
-    localStorage.removeItem('voiceHistory');
-    renderHistory();
-});
+        voiceHistory = [];
+        localStorage.removeItem('voiceHistory');
+        renderHistory();
+    });
 
     // --- Copy transcript ---
     document.getElementById('voiceCopyBtn')?.addEventListener('click', () => {
@@ -1926,12 +1962,12 @@ function startVoice() {
         voiceResultEl.innerHTML = '';
     }
     try {
-    recognition.start();
-} catch (e) {
-    console.warn('Voice start error:', e);
-    showToast('خطا', 'دسترسی به میکروفون داده نشد یا مشکلی وجود دارد', 'error');
-    stopVoice(); // reset UI
-}
+        recognition.start();
+    } catch (e) {
+        console.warn('Voice start error:', e);
+        showToast('خطا', 'دسترسی به میکروفون داده نشد یا مشکلی وجود دارد', 'error');
+        stopVoice(); // reset UI
+    }
 }
 
 function stopVoice() {
@@ -2022,27 +2058,31 @@ function confirmCommand(parsedText, params) {
 }
 
 // ============================================
-// MAIN COMMAND PARSER (ENHANCED)
+// ENHANCED MAIN COMMAND PARSER
 // ============================================
 
 function extractParams(text) {
     const params = {};
+    let lower = text.toLowerCase();
+
     // --- Ranges ---
     const rangeMatch = text.match(/(?:between|از)\s*(\d+(?:\.\d+)?)\s*(?:and|تا)\s*(\d+(?:\.\d+)?)/i);
     if (rangeMatch) {
         params.rangeMin = parseFloat(rangeMatch[1]);
         params.rangeMax = parseFloat(rangeMatch[2]);
     }
+
     // --- Negations ---
     if (text.includes('not using') || text.includes('بدون') || text.includes('غیرفعال')) {
         params.negated = true;
     }
+
     // --- Time expressions ---
     const timeMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:hour|hr|ساعت|h)/i);
     if (timeMatch) params.time = parseFloat(timeMatch[1]);
-    // Frequency: q6h, q8h, etc.
     const freqMatch = text.match(/q(\d+)(h|hr)/i);
     if (freqMatch) params.frequency = parseInt(freqMatch[1]);
+
     // --- Drug concentration (e.g., "500 mg in 250 mL") ---
     const concMatch = text.match(/(\d+(?:\.\d+)?)\s*(mg|mcg|g|units)\s+(?:in|در)\s+(\d+(?:\.\d+)?)\s*(ml|mL|cc)/i);
     if (concMatch) {
@@ -2051,10 +2091,39 @@ function extractParams(text) {
         params.concVolume = parseFloat(concMatch[3]);
         params.concVolUnit = concMatch[4];
     }
-    // --- Other numbers with units ---
+
+    // --- ENHANCED: Extract weight (Persian & English) ---
+    const weightPatterns = [
+        /(?:وزن|وزنش|وزن بیمار|weight)\s*(\d+(?:\.\d+)?)\s*(?:kg|کیلوگرم|کیلو)?/i,
+        /(\d+(?:\.\d+)?)\s*(?:kg|کیلوگرم|کیلو)(?:\s*وزن)?/i,
+        /weight\s*(\d+(?:\.\d+)?)\s*(?:kg)?/i,
+    ];
+    for (const pattern of weightPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+            params.weight = parseFloat(match[1]);
+            text = text.replace(match[0], '');
+            break;
+        }
+    }
+
+    // --- ENHANCED: Extract height (Persian & English) ---
+    const heightPatterns = [
+        /(?:قد|قدش|قد بیمار|height)\s*(\d+(?:\.\d+)?)\s*(?:cm|سانتی‌متر|سانت)?/i,
+        /(\d+(?:\.\d+)?)\s*(?:cm|سانتی‌متر|سانت)(?:\s*قد)?/i,
+        /height\s*(\d+(?:\.\d+)?)\s*(?:cm)?/i,
+    ];
+    for (const pattern of heightPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+            params.height = parseFloat(match[1]);
+            text = text.replace(match[0], '');
+            break;
+        }
+    }
+
+    // --- Generic numbers with units ---
     const patterns = [
-        { regex: /(\d+(?:\.\d+)?)\s*(kg|کیلوگرم)/i, key: 'weight' },
-        { regex: /(\d+(?:\.\d+)?)\s*(cm|سانتی‌متر|قد)/i, key: 'height' },
         { regex: /(\d+(?:\.\d+)?)\s*(yr|سال|age)/i, key: 'age' },
         { regex: /(\d+(?:\.\d+)?)\s*(ml|mL|cc|سی‌سی)/i, key: 'volume' },
         { regex: /(\d+(?:\.\d+)?)\s*(mg|mcg|g|units)/i, key: 'dose' },
@@ -2077,7 +2146,8 @@ function extractParams(text) {
             }
         }
     });
-    // GCS without labels
+
+    // --- GCS without labels ---
     if (!params.gcs_eye && !params.gcs_verbal && !params.gcs_motor) {
         const gcsNums = text.match(/(?:gcs|گلاسکو)\s*(\d+)\s*(\d+)\s*(\d+)/i);
         if (gcsNums) {
@@ -2086,31 +2156,39 @@ function extractParams(text) {
             params.gcs_motor = parseInt(gcsNums[3]);
         }
     }
-    // Gender
+
+    // --- Gender ---
     if (text.includes('male') || text.includes('مرد')) params.gender = 'male';
     else if (text.includes('female') || text.includes('زن')) params.gender = 'female';
-    // Drug
+
+    // --- Drug ---
     const drugId = findDrugName(text);
     if (drugId) params.drugId = drugId;
-    // Solution
+
+    // --- Solution ---
     if (text.includes('ns') || text.includes('سالین')) params.solution = 'N.S';
     else if (text.includes('d5w') || text.includes('دکستروز')) params.solution = 'D5W';
-    // Method
+
+    // --- Method ---
     if (text.includes('سرنگ')) params.method = 'syringe';
     else if (text.includes('انفوزیون') || text.includes('پمپ')) params.method = 'infusion';
-    // Ampoules
+
+    // --- Ampoules ---
     const ampMatch = text.match(/آمپول\s*(\d+)/i);
     if (ampMatch) params.ampoules = parseInt(ampMatch[1]);
-    // Custom amount
+
+    // --- Custom amount ---
     const customMatch = text.match(/(دلخواه|مقدار)\s*(\d+(?:\.\d+)?)\s*(units|mg|mcg|g)/i);
     if (customMatch) {
         params.customAmount = parseFloat(customMatch[2]);
         params.customUnit = customMatch[3].toLowerCase();
     }
-    // Oxygen flow
+
+    // --- Oxygen flow ---
     const flowMatch = text.match(/(\d+(?:\.\d+)?)\s*(L\/min|litre\/min|لیتر در دقیقه)/i);
     if (flowMatch) params.flow = parseFloat(flowMatch[1]);
-    // Electrolyte
+
+    // --- Electrolyte ---
     const elemMap = {
         'sodium': 'sodium',
         'potassium': 'potassium',
@@ -2125,7 +2203,8 @@ function extractParams(text) {
             break;
         }
     }
-    // Two drugs for Y-Site
+
+    // --- Two drugs for Y-Site ---
     const twoDrugs = text.match(/(\w+)\s+(?:and|و)\s+(\w+)/i);
     if (twoDrugs) {
         const d1 = findDrugName(twoDrugs[1]);
@@ -2135,30 +2214,37 @@ function extractParams(text) {
             params.drug2 = d2;
         }
     }
-    // RASS score
+
+    // --- RASS score ---
     const rassMatch = text.match(/rass\s*([+-]?\d+)/i);
     if (rassMatch) params.rassScore = parseInt(rassMatch[1]);
-    // Braden scores (6 numbers)
+
+    // --- Braden scores (6 numbers) ---
     const bradenMatch = text.match(/برادن\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)/i);
     if (bradenMatch) {
         params.bradenScores = bradenMatch.slice(1,7).map(Number);
     }
-    // Morse scores (6 numbers)
+
+    // --- Morse scores (6 numbers) ---
     const morseMatch = text.match(/مورس\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)/i);
     if (morseMatch) {
         params.morseScores = morseMatch.slice(1,7).map(Number);
     }
+
+    // --- Store original text for debugging ---
+    params._original = text;
+
     return params;
 }
 
-// --- Command scoring (unchanged, but we add "settings" category) ---
+// --- Command scoring (with settings and all tools) ---
 const COMMAND_KEYWORDS = {
     drug: {
         triggers: ['دارو', 'دوز', 'انفوزیون', 'تزریق', 'پمپ', 'سرنگ', 'میکروگرم', 'میلی‌گرم', 'واحد', 'kg', 'kg/h', 'mcg', 'mg', 'units'],
         scoreWeight: 1.0
     },
     bmi: {
-        triggers: ['bmi', 'شاخص توده', 'وزن', 'قد', 'body mass index'],
+        triggers: ['bmi', 'شاخص توده', 'وزن', 'قد', 'body mass index', 'بی ام آی', 'b.m.i'],
         scoreWeight: 0.9
     },
     bsa: {
@@ -2302,7 +2388,6 @@ function processVoiceCommand(text) {
     // ---- Check for corrections (e.g., "no, I meant ...") ----
     if (lower.includes('no') || lower.includes('نه') || lower.includes('اشتباه')) {
         if (lastCommand) {
-            // Re‑process with the last command's context? For now, just tell user to re‑state.
             showVoiceResult('دستور قبلی لغو شد. لطفاً دوباره بگویید.', 'info');
             lastCommand = null;
             lastParams = null;
@@ -2314,14 +2399,21 @@ function processVoiceCommand(text) {
     const scores = scoreCommand(normalized, params);
     const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
     const best = sorted[0];
+
+    // ---- FALLBACK: If no command scored, but we have weight & height -> assume BMI ----
     if (!best || best[1] === 0) {
+        if (params.weight && params.height) {
+            // No command matched, but we have weight and height -> BMI
+            executeCommand('bmi', normalized, params);
+            return;
+        }
         showVoiceResult('متوجه نشدم. لطفاً واضح‌تر بگویید یا از دکمه‌های نمونه استفاده کنید.', 'error');
         return;
     }
+
     const cmd = best[0];
 
     // ---- Confirm (if high‑confidence, skip; else ask) ----
-    // Simple confidence: if score > 5, auto‑execute; else ask.
     const confidence = best[1];
     if (confidence < 5) {
         confirmCommand(normalized, params).then(ok => {
@@ -2402,7 +2494,6 @@ function executeCommand(cmd, text, params) {
     const tip = TIPS[cmd];
     if (tip) {
         setTimeout(() => {
-            // Show as a toast or in result area (we'll use result)
             if (voiceResultEl) {
                 voiceResultEl.innerHTML += `<div class="voice-tip" style="margin-top:8px;font-size:12px;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:6px;">${tip}</div>`;
             }
@@ -2414,7 +2505,7 @@ function executeCommand(cmd, text, params) {
 // HANDLER FUNCTIONS (implement all tools)
 // ============================================
 
-// ---- Drug handler (already implemented, but we reuse the one from before) ----
+// ---- Drug handler ----
 function handleDrugVoice(text, params) {
     const drugId = params.drugId || findDrugName(text);
     if (!drugId) {
@@ -2520,7 +2611,7 @@ function handleDrugVoice(text, params) {
     }, 400);
 }
 
-// ---- BMI ----
+// ---- BMI (with accordion auto-open) ----
 function handleBMIVoice(params) {
     const w = params.weight || 0;
     const h = params.height || 0;
@@ -2535,6 +2626,7 @@ function handleBMIVoice(params) {
     const msg = result ? 'BMI محاسبه شد: ' + (result.textContent || result.innerText) : 'BMI محاسبه شد';
     showVoiceResult(msg, 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('bmiAccordionItem'), 300);
 }
 
 // ---- BSA ----
@@ -2547,7 +2639,6 @@ function handleBSAVoice(params) {
     }
     document.getElementById('bsaWeight').value = w;
     document.getElementById('bsaHeight').value = h;
-    // formula detection
     const text = params._original || '';
     const formulaSelect = document.getElementById('bsaFormula');
     if (formulaSelect) {
@@ -2558,6 +2649,7 @@ function handleBSAVoice(params) {
     calculateBSA();
     showVoiceResult('BSA محاسبه شد', 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('bsaAccordionItem'), 300);
 }
 
 // ---- CrCl ----
@@ -2577,6 +2669,7 @@ function handleCrClVoice(params) {
     calculateCrCl();
     showVoiceResult('کلیرانس کراتینین محاسبه شد', 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('crclAccordionItem'), 300);
 }
 
 // ---- Drip Rate ----
@@ -2592,6 +2685,7 @@ function handleDripRateVoice(params) {
     calculateDripRateLive();
     showVoiceResult('نرخ قطره محاسبه شد', 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('dripAccordionItem'), 300);
 }
 
 // ---- Convert ----
@@ -2633,6 +2727,7 @@ function handleConvertVoice(text, params) {
     }
     showVoiceResult('تبدیل انجام شد', 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('electrolyteAccordionItem'), 300);
 }
 
 // ---- GCS ----
@@ -2641,7 +2736,6 @@ function handleGCSVoice(text, params) {
     let v = params.gcs_verbal || 0;
     let m = params.gcs_motor || 0;
     if (!e || !v || !m) {
-        // try to parse from text like "GCS 4 5 6"
         const nums = text.match(/(\d+)\s*(\d+)\s*(\d+)/);
         if (nums) {
             e = parseInt(nums[1]); v = parseInt(nums[2]); m = parseInt(nums[3]);
@@ -2663,6 +2757,7 @@ function handleGCSVoice(text, params) {
     });
     showVoiceResult(`GCS محاسبه شد: E${e} V${v} M${m}`, 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('gcsAccordionItem'), 300);
 }
 
 // ---- RASS ----
@@ -2682,6 +2777,7 @@ function handleRASSVoice(text, params) {
     });
     showVoiceResult(`RASS ${score} تنظیم شد`, 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('rassAccordionItem'), 300);
 }
 
 // ---- Braden ----
@@ -2700,6 +2796,7 @@ function handleBradenVoice(params) {
     });
     showVoiceResult('مقیاس برادن تنظیم شد', 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('bradenAccordionItem'), 300);
 }
 
 // ---- Morse ----
@@ -2718,6 +2815,7 @@ function handleMorseVoice(params) {
     });
     showVoiceResult('مقیاس مورس تنظیم شد', 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('morseAccordionItem'), 300);
 }
 
 // ---- Burns ----
@@ -2726,6 +2824,7 @@ function handleBurnsVoice(text) {
     showVoiceResult('لطفاً روی نواحی سوختگی در بخش سوختگی کلیک کنید.', 'info');
     if (text.includes('کودک') || text.includes('pediatric')) setBurnsAge('pediatric');
     else setBurnsAge('adult');
+    setTimeout(() => openAccordionById('burnsAccordionItem'), 300);
 }
 
 // ---- Oxygen ----
@@ -2744,6 +2843,7 @@ function handleOxygenVoice(params) {
     calculateOxygen();
     showVoiceResult('مدت کپسول اکسیژن محاسبه شد', 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('oxygenAccordionItem'), 300);
 }
 
 // ---- VBG ----
@@ -2763,6 +2863,7 @@ function handleVBGVoice(text, params) {
     interpretVBG();
     showVoiceResult('تفسیر گازهای خون انجام شد', 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('vbgAccordionItem'), 300);
 }
 
 // ---- Ventilator ----
@@ -2782,6 +2883,7 @@ function handleVentilatorVoice(text, params) {
     calculateVentTV();
     showVoiceResult('حجم جاری ونتیلاتور محاسبه شد', 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('ventilatorAccordionItem'), 300);
 }
 
 // ---- Nutrition ----
@@ -2808,6 +2910,7 @@ function handleNutritionVoice(text, params) {
     calculateNutrition();
     showVoiceResult('نیاز تغذیه‌ای محاسبه شد', 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('nutritionAccordionItem'), 300);
 }
 
 // ---- Y-Site ----
@@ -2824,6 +2927,7 @@ function handleYSiteVoice(text, params) {
     });
     showVoiceResult(`سازگاری ${drugDatabase[d1]?.persianName} و ${drugDatabase[d2]?.persianName} بررسی شد`, 'success');
     switchTab('tools');
+    setTimeout(() => openAccordionById('ysiteAccordionItem'), 300);
 }
 
 // ---- Show result ----
@@ -2832,7 +2936,6 @@ function showVoiceResult(message, type = 'success') {
     if (!resultEl) return;
     resultEl.style.display = 'block';
     resultEl.className = 'voice-result' + (type === 'error' ? ' error' : '');
-    // Insert as HTML (with support for tips later)
     resultEl.innerHTML = message;
     if (voiceStatusEl) voiceStatusEl.textContent = type === 'error' ? 'خطا' : 'انجام شد';
     clearTimeout(voiceTimer);
@@ -2841,8 +2944,7 @@ function showVoiceResult(message, type = 'success') {
     }, 12000);
 }
 
-// ---- findDrugName, extractNumberSimple, etc. (keep unchanged) ----
-// (All the helper functions from the previous version remain the same)
+// ---- findDrugName, extractNumberSimple, etc. ----
 function findDrugName(text) {
     const lower = text.toLowerCase();
     for (const [id, drug] of Object.entries(drugDatabase)) {
@@ -3115,7 +3217,6 @@ function calculateManualInfusion() {
     }
 
     // Normalize drug amount to the dose unit's base unit
-    // e.g. drug in mg, dose in mcg → convert drug to mcg for concentration
     let drugAmountNorm = drugAmount;
     if (drugUnit === 'g' && (doseUnit.includes('mg') || doseUnit.includes('mcg'))) drugAmountNorm *= 1000;
     if (drugUnit === 'mg' && doseUnit.includes('mcg')) drugAmountNorm *= 1000;
@@ -3625,15 +3726,12 @@ function loadDrugLibrary() {
     if (container.children.length > 0) { wireDrugLibrarySearch(); return; }
 
     Object.values(drugDatabase).forEach(drug => {
-        // Format dose range with proper LTR isolation for numbers
-        // Inside loadDrugLibrary, replace the doseRangeDisplay block with:
-let doseRangeDisplay = '--';
-if (drug.typicalDoseRange) {
-    const minFormatted = drug.typicalDoseRange.min.toFixed(1);
-    const maxFormatted = drug.typicalDoseRange.max.toFixed(1);
-    // Force LTR and use Latin numbers
-    doseRangeDisplay = `<span dir="ltr" style="display:inline-block; unicode-bidi:isolate; font-family: monospace;">${minFormatted}–${maxFormatted} ${drug.typicalDoseRange.unit}</span>`;
-}
+        let doseRangeDisplay = '--';
+        if (drug.typicalDoseRange) {
+            const minFormatted = drug.typicalDoseRange.min.toFixed(1);
+            const maxFormatted = drug.typicalDoseRange.max.toFixed(1);
+            doseRangeDisplay = `<span dir="ltr" style="display:inline-block; unicode-bidi:isolate; font-family: monospace;">${minFormatted}–${maxFormatted} ${drug.typicalDoseRange.unit}</span>`;
+        }
         const maxConc = drug.maxSafeConcentration || '--';
         const solutions = drug.solutionType.join(' / ');
         const compatible = (drug.ySiteCompatibilities?.compatible || []).slice(0, 5);
@@ -4018,7 +4116,6 @@ function measureTabBarHeight() {
     const rect = tabBar.getBoundingClientRect();
     const height = rect.height;
     if (height > 20) {
-        // Set directly on the element — bypasses any env() first-render issue
         mainContent.style.bottom = height + 'px';
         document.documentElement.style.setProperty('--tab-bar-height', height + 'px');
         return true;
@@ -4039,8 +4136,6 @@ function setupTabBarMeasurement() {
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) setTimeout(measureTabBarHeight, 200);
     });
-    // visualViewport fires when iOS finishes calculating safe area insets
-    // This is the key fix for the first-load gap on iOS PWA
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', measureTabBarHeight);
     }
@@ -4072,12 +4167,12 @@ function setupOfflineIndicator() {
     window.addEventListener('online', update);
     if (!navigator.onLine) update();
 }
+
 // ============================================
 // SWIPE GESTURE FOR TAB SWITCHING (Mobile)
 // ============================================
-
 function initSwipe() {
-    if (window.innerWidth > 768) return; // desktop only
+    if (window.innerWidth > 768) return;
     const container = document.querySelector('.main-content');
     if (!container) return;
 
@@ -4085,13 +4180,11 @@ function initSwipe() {
     let touchStartY = 0;
     let touchEndX = 0;
     let touchEndY = 0;
-    let swipeLocked = false; // true when touch started inside a h-scrollable element
+    let swipeLocked = false;
     const minHorizontalDistance = 80;
     const maxVerticalDistance = 50;
 
     function isInsideHScrollable(el) {
-        // Walk up the DOM — if any ancestor (before .main-content) is
-        // horizontally scrollable and actually has overflow to scroll, lock swipe.
         while (el && el !== container) {
             const style = window.getComputedStyle(el);
             const overflowX = style.overflowX;
@@ -4109,34 +4202,28 @@ function initSwipe() {
     }, { passive: true });
 
     container.addEventListener('touchend', (e) => {
-        if (swipeLocked) return; // touch started in drug list or similar — ignore
-
+        if (swipeLocked) return;
         touchEndX = e.changedTouches[0].screenX;
         touchEndY = e.changedTouches[0].screenY;
-
         const diffX = Math.abs(touchEndX - touchStartX);
         const diffY = Math.abs(touchEndY - touchStartY);
-
         if (diffX < minHorizontalDistance || diffY > diffX) return;
-
         const direction = (touchEndX - touchStartX) > 0 ? 'right' : 'left';
         const tabs = ['calculator', 'drugs', 'tools'];
         const current = AppState.currentTab;
         let newIndex = tabs.indexOf(current);
-
         if (direction === 'right') {
             newIndex = (newIndex - 1 + tabs.length) % tabs.length;
         } else {
             newIndex = (newIndex + 1) % tabs.length;
         }
-
         if (newIndex !== tabs.indexOf(current)) {
             switchTab(tabs[newIndex]);
             haptic(20);
         }
     }, { passive: true });
 }
-// ============================================
+
 // ============================================
 // REVERSE TOOLTIP
 // ============================================
@@ -4171,7 +4258,6 @@ function setupOnboarding() {
     const slides = slidesContainer ? Array.from(slidesContainer.querySelectorAll('.tutorial-slide')) : [];
     let current = 0;
 
-    // Build dots
     if (dotsContainer && slides.length) {
         slides.forEach((_, i) => {
             const dot = document.createElement('span');
@@ -4216,7 +4302,6 @@ function setupOnboarding() {
     if (skipBtn) skipBtn.addEventListener('click', () => { closeTutorial(); });
     overlay.querySelector('.onboarding-backdrop')?.addEventListener('click', closeTutorial);
 
-    // Touch swipe support on slides
     let touchStartX = 0;
     if (slidesContainer) {
         slidesContainer.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
@@ -4226,19 +4311,16 @@ function setupOnboarding() {
         }, { passive: true });
     }
 
-    // Show if not seen before
     const seen = localStorage.getItem('onboardingSeen');
     if (!seen) {
         setTimeout(() => {
             overlay.style.display = 'flex';
             requestAnimationFrame(() => overlay.classList.add('visible'));
-        }, 3500); // after loading screen and greeting
+        }, 3500);
     }
 }
 
-// Expose tutorial for settings "show again" button
 window.showTutorial = function() {
-    // Close settings modal first if open
     const settingsModal = document.getElementById('settingsModal');
     if (settingsModal && settingsModal.classList.contains('active')) {
         settingsModal.classList.remove('active');
@@ -4246,7 +4328,6 @@ window.showTutorial = function() {
     }
     const overlay = document.getElementById('onboardingOverlay');
     if (!overlay) return;
-    // Reset to slide 1
     const slides = overlay.querySelectorAll('.tutorial-slide');
     slides.forEach((s, i) => s.classList.toggle('active', i === 0));
     const dots = overlay.querySelectorAll('.tutorial-dot');
@@ -4448,7 +4529,6 @@ function setupThemePicker() {
 // ============================================
 // ACCORDION
 // ============================================
-// Floating accordion close bar — appears at top when user scrolls past header
 let _accordionFloatBar = null;
 let _accordionScrollHandler = null;
 
@@ -4463,8 +4543,6 @@ function removeAccordionFloatBar() {
 
 function addAccordionFloatBar(item, headerBtn) {
     removeAccordionFloatBar();
-
-    // Get title from the header
     const titleEl = headerBtn.querySelector('.accordion-title');
     const iconEl  = headerBtn.querySelector('.accordion-icon-wrap i');
     const title   = titleEl ? titleEl.textContent : 'بستن';
@@ -4485,11 +4563,9 @@ function addAccordionFloatBar(item, headerBtn) {
     document.body.appendChild(bar);
     _accordionFloatBar = bar;
 
-    // Show/hide based on whether header is out of view
     const pane = document.querySelector('.tab-pane.active') || window;
     _accordionScrollHandler = () => {
         const headerRect = headerBtn.getBoundingClientRect();
-        // Header scrolled above visible area
         if (headerRect.bottom < 60) {
             bar.classList.add('visible');
         } else {
@@ -4505,7 +4581,6 @@ function toggleAccordion(headerBtn) {
     const chevron = headerBtn.querySelector('.accordion-chevron');
     const isOpen = item.classList.contains('open');
 
-    // Close any other open accordion
     document.querySelectorAll('.accordion-item.open').forEach(openItem => {
         if (openItem !== item) {
             openItem.classList.remove('open');
@@ -4534,7 +4609,6 @@ function toggleAccordion(headerBtn) {
     }
 }
 
-// Android back button
 window.addEventListener('popstate', () => {
     const openItem = document.querySelector('.accordion-item.open');
     if (openItem) {
@@ -4888,6 +4962,7 @@ window.resetBurns = resetBurns;
 window.updateParkland = updateParkland;
 window.restoreFromHistory = restoreFromHistory;
 window.updateDoseRangeIndicator = updateDoseRangeIndicator;
+window.openAccordionById = openAccordionById;
 
 // ============================================
 // USER NAME & GREETING BANNER
@@ -4895,8 +4970,8 @@ window.updateDoseRangeIndicator = updateDoseRangeIndicator;
 function getGreeting() {
     const h   = new Date().getHours();
     const raw = (localStorage.getItem('userName') || '').trim();
-    const n   = raw ? '\u2066' + raw + '\u2069' : '';   // LTR-isolated name
-    const app = '\u2066FoxiMed\u2069';                   // LTR-isolated app name
+    const n   = raw ? '\u2066' + raw + '\u2069' : '';
+    const app = '\u2066FoxiMed\u2069';
 
     const morning = n ? [
         `صبح بخیر ${n} عزیز 🌅`,
@@ -4989,7 +5064,6 @@ function showGreetingBanner() {
     banner.classList.remove('banner-hiding');
     banner.classList.add('banner-visible');
 
-    // Auto-dismiss after 4.5 s
     let autoDismiss = setTimeout(dismissBanner, 4500);
 
     function dismissBanner() {
@@ -5007,10 +5081,8 @@ function setupUserName() {
     const hint    = document.getElementById('userNameHint');
     if (!input || !saveBtn) return;
 
-    // Get stored name
     let storedName = localStorage.getItem('userName') || '';
 
-    // Helper: update button active state based on current input vs stored name
     function updateButtonState() {
         const currentValue = input.value.trim();
         const isValid = currentValue !== '' && currentValue !== storedName;
@@ -5021,14 +5093,11 @@ function setupUserName() {
         }
     }
 
-    // Helper: save name (only if button is active)
     function saveName() {
-        if (!saveBtn.classList.contains('active')) return; // prevent saving empty/duplicate
-
+        if (!saveBtn.classList.contains('active')) return;
         const newName = input.value.trim();
         localStorage.setItem('userName', newName);
-        storedName = newName;   // update internal stored reference
-
+        storedName = newName;
         if (hint) {
             hint.textContent = newName ? `نام ذخیره شد: ${newName}` : 'نامی ذخیره نشده';
             hint.classList.add('hint-saved');
@@ -5037,24 +5106,14 @@ function setupUserName() {
                 hint.classList.remove('hint-saved');
             }, 2000);
         }
-
-        // After saving, button should become inactive (no pending change)
         updateButtonState();
     }
 
-    // Set initial value
     input.value = storedName;
-
-    // Initial button state
     updateButtonState();
 
-    // Event: input changes
     input.addEventListener('input', updateButtonState);
-
-    // Event: save button click
     saveBtn.addEventListener('click', saveName);
-
-    // Event: Enter key in input field
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -5090,31 +5149,20 @@ function setupHelpPopovers() {
         const key = btn.dataset.help;
         const text = HELP_TEXTS[key];
         if (!text) return;
-
-        // Set text (support \n as line breaks)
         popoverText.innerHTML = text.replace(/\n/g, '<br>');
-
-        // Position: below the button
         popover.style.display = 'block';
         const btnRect = btn.getBoundingClientRect();
         const popRect = popover.getBoundingClientRect();
         const scrollY = window.scrollY || 0;
-
         let top = btnRect.bottom + scrollY + 8;
         let left = btnRect.left - popRect.width / 2 + btnRect.width / 2;
-
-        // Clamp to screen edges
         const margin = 12;
         left = Math.max(margin, Math.min(left, window.innerWidth - popRect.width - margin));
-
         popover.style.top = top + 'px';
         popover.style.left = left + 'px';
-
-        // Arrow horizontal position relative to popover
         const arrowLeft = (btnRect.left + btnRect.width / 2) - left;
         popover.querySelector('.help-popover-arrow').style.right = 'auto';
         popover.querySelector('.help-popover-arrow').style.left = Math.max(12, arrowLeft) + 'px';
-
         activeBtn = btn;
         btn.classList.add('active');
     }
@@ -5124,7 +5172,6 @@ function setupHelpPopovers() {
         if (activeBtn) { activeBtn.classList.remove('active'); activeBtn = null; }
     }
 
-    // Delegate — works for dynamically added buttons too
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('.help-icon');
         if (btn) {
@@ -5136,7 +5183,6 @@ function setupHelpPopovers() {
         if (!popover.contains(e.target)) hidePopover();
     });
 
-    // Close on scroll or resize
     document.addEventListener('scroll', hidePopover, { passive: true });
     window.addEventListener('resize', hidePopover, { passive: true });
 }
@@ -5368,7 +5414,6 @@ function setupOxygenCalculator() {
             fixVolumeButtonColors();
         });
     });
-    // Wire Persian input normalization
     ['oxyCylinderSize','oxyPressure','oxyFlow'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -5377,7 +5422,6 @@ function setupOxygenCalculator() {
             if (normalized !== this.value) this.value = normalized;
         });
     });
-    // Set default size
     if (sizeInput) sizeInput.value = '5';
 }
 
@@ -5391,10 +5435,7 @@ window.calculateOxygen = function() {
     if (!pressure     || isNaN(pressure)     || pressure <= 0)     { showToast('خطا', 'فشار کپسول را وارد کنید', 'error'); return; }
     if (!flow         || isNaN(flow)         || flow <= 0)         { showToast('خطا', 'جریان اکسیژن را وارد کنید', 'error'); return; }
 
-    // Total gas volume = cylinder volume (L) × pressure (bar)
-    // 1 bar ≈ 1 atm for practical purposes; at atmospheric pressure (1 bar) the gas expands to pressure × size liters
     const totalVolume = cylinderSize * pressure;
-    // Apply 10% safety reserve — don't use the last 10%
     const usableVolume = totalVolume * 0.9;
     const durationMinutes = usableVolume / flow;
     const hours = Math.floor(durationMinutes / 60);
@@ -5800,20 +5841,16 @@ function renderMatrix(selected) {
     setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
 }
 
-// setupYSiteChecker wired in initializeApp
-
 // ============================================
 // VENTILATOR TIDAL VOLUME CALCULATOR
 // ============================================
 function setupVentilatorCalc() {
-    // Gender buttons
     const genderBtns = document.querySelectorAll('#ventGenderBtns .method-btn-compact');
     genderBtns.forEach(btn => btn.addEventListener('click', function() {
         genderBtns.forEach(b => b.classList.remove('active'));
         this.classList.add('active');
     }));
 
-    // Method tabs
     const tabs = document.querySelectorAll('#ventMethodTabs .vent-tab');
     tabs.forEach(tab => tab.addEventListener('click', function() {
         tabs.forEach(t => t.classList.remove('active'));
@@ -5839,18 +5876,13 @@ window.calculateVentTV = function() {
         if (!heightCm || isNaN(heightCm) || heightCm < 100 || heightCm > 230) {
             showToast('خطا', 'قد را به درستی وارد کنید (100–230 cm)', 'error'); return;
         }
-
     } else if (method === 'ulna') {
         const ulna = PersianNumbers.parseNumber(document.getElementById('ventUlna')?.value);
         if (!ulna || isNaN(ulna)) { showToast('خطا', 'طول اولنا را وارد کنید', 'error'); return; }
-        // Kwok & Whitelaw formula (PMID 1574843)
-        // Male:   height = 3.294 * ulna + 82.7
-        // Female: height = 3.316 * ulna + 81.3  (simplified)
         heightCm = gender === 'male' ? (3.294 * ulna + 82.7) : (3.316 * ulna + 81.3);
         estimationNote = `قد تخمینی از طول اولنا (${ulna} cm): <strong>${heightCm.toFixed(1)} cm</strong>`;
     }
 
-    // PBW (Predicted Body Weight) — ARDSNet formula
     const heightInch = heightCm / 2.54;
     const pbw = gender === 'male'
         ? 50 + 2.3 * (heightInch - 60)
@@ -5858,7 +5890,6 @@ window.calculateVentTV = function() {
 
     if (pbw < 20) { showToast('خطا', 'قد وارد شده خیلی کوتاه است', 'error'); return; }
 
-    // TV at different mL/kg
     const tv4  = pbw * 4;
     const tv6  = pbw * 6;
     const tv7  = pbw * 7;
@@ -5919,7 +5950,6 @@ window.calculateNutrition = function() {
     if (!height || isNaN(height) || height < 100) { showToast('خطا', 'قد را وارد کنید', 'error'); return; }
     if (!age    || isNaN(age)    || age < 1)      { showToast('خطا', 'سن را وارد کنید', 'error'); return; }
 
-    // Harris-Benedict BMR
     let bmr_hb, bmr_ms;
     if (gender === 'male') {
         bmr_hb = 66.5 + (13.75 * weight) + (5.003 * height) - (6.75 * age);
@@ -5929,13 +5959,9 @@ window.calculateNutrition = function() {
         bmr_ms = 10 * weight + 6.25 * height - 5 * age - 161;
     }
 
-    // TEE (Total Energy Expenditure) with stress factor
-    // ICU patients typically sedentary activity factor = 1.0-1.1
     const activityFactor = 1.05;
-    const tee_hb = Math.round(bmr_hb * activityFactor * stress);
     const tee_ms = Math.round(bmr_ms * activityFactor * stress);
 
-    // Protein requirements by condition
     let proteinMin, proteinMax, proteinNote;
     if (stress <= 1.1) {
         proteinMin = 0.8; proteinMax = 1.0;
@@ -5956,16 +5982,10 @@ window.calculateNutrition = function() {
     const protMinKcal = Math.round(protMinG * 4);
     const protMaxKcal = Math.round(protMaxG * 4);
 
-    // Non-protein calories
     const npcMin = tee_ms - protMaxKcal;
-    const npcMax = tee_ms - protMinKcal;
-
-    // Enteral rate suggestion (assuming 1 kcal/mL standard formula)
     const enteralRateMin = Math.round(npcMin / 24);
     const enteralRateMax = Math.round(tee_ms / 24);
-
-    // Fluid from enteral feeding
-    const fluidFromFeed = Math.round(enteralRateMax * 0.85); // ~85% of volume is free water
+    const fluidFromFeed = Math.round(enteralRateMax * 0.85);
 
     resultDiv.innerHTML = `
         <div class="nut-section">
@@ -5993,7 +6013,6 @@ window.calculateNutrition = function() {
     setTimeout(() => resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
 };
 
-// Gender buttons for nutrition
 (function setupNutritionGender() {
     document.addEventListener('DOMContentLoaded', () => {
         const genderBtns = document.querySelectorAll('#nutGenderBtns .method-btn-compact');
@@ -6379,4 +6398,3 @@ window.interpretVBG = function() {
     haptic(40);
     setTimeout(() => resultEl.scrollIntoView({ behavior:'smooth', block:'nearest' }), 100);
 };
-
