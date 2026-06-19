@@ -1785,14 +1785,20 @@ function renderHistory() {
     const container = document.getElementById('voiceHistoryList');
     const historyWrap = document.getElementById('voiceHistory');
     if (!container) return;
-    if (voiceHistory.length === 0) {
+
+    // Show only the last 3 commands in the UI
+    const displayHistory = voiceHistory.slice(0, 3);
+
+    if (displayHistory.length === 0) {
         if (historyWrap) historyWrap.style.display = 'none';
         return;
     }
     if (historyWrap) historyWrap.style.display = 'block';
-    container.innerHTML = voiceHistory.map(cmd =>
+
+    container.innerHTML = displayHistory.map(cmd =>
         `<span class="voice-history-chip" data-cmd="${cmd}">${cmd}</span>`
     ).join('');
+
     container.querySelectorAll('.voice-history-chip').forEach(chip => {
         chip.addEventListener('click', function() {
             processTextInput(this.dataset.cmd);
