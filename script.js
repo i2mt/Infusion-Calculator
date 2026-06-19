@@ -2138,21 +2138,6 @@ window.processTextInput = function(text) {
     // Process
     processVoiceCommand(text);
 };
-// ============================================
-// TEXT INPUT FALLBACK
-// ============================================
-function processTextInput(text) {
-    if (!text) return;
-    addToHistory(text);
-    if (voiceTranscriptEl) {
-        voiceTranscriptEl.textContent = text;
-        voiceTranscriptEl.classList.add('active');
-    }
-    // Show loading
-    if (voiceStatusEl) voiceStatusEl.textContent = 'در حال پردازش...';
-    // Process
-    processVoiceCommand(text);
-}
 
 // ============================================
 // COMMAND HISTORY
@@ -2163,25 +2148,6 @@ function addToHistory(text) {
     if (voiceHistory.length > 10) voiceHistory.pop();
     localStorage.setItem('voiceHistory', JSON.stringify(voiceHistory));
     renderHistory();
-}
-
-function renderHistory() {
-    const container = document.getElementById('voiceHistoryList');
-    const historyWrap = document.getElementById('voiceHistory');
-    if (!container) return;
-    if (voiceHistory.length === 0) {
-        historyWrap.style.display = 'none';
-        return;
-    }
-    historyWrap.style.display = 'block';
-    container.innerHTML = voiceHistory.map(cmd =>
-        `<span class="voice-history-chip" data-cmd="${cmd}">${cmd}</span>`
-    ).join('');
-    container.querySelectorAll('.voice-history-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-            processTextInput(chip.dataset.cmd);
-        });
-    });
 }
 
 // ============================================
@@ -2629,17 +2595,6 @@ if (lower.includes('small font') || lower.includes('فونت کوچک') || lower
     applySettings();
     showVoiceResult('فونت معمولی فعال شد', 'success');
     return;
-}
-// === Theme color commands ===
-const themeNames = ['fox', 'ocean', 'rose', 'forest', 'default'];
-for (const theme of themeNames) {
-    if (lower.includes(theme + ' theme') || lower.includes('تم ' + theme)) {
-        AppState.settings.colorTheme = theme;
-        saveSettings();
-        applyTheme(theme);
-        showVoiceResult(`تم ${theme} فعال شد`, 'success');
-        return;
-    }
 }
     // ---- Extract params ----
     const params = extractParams(normalized);
@@ -3393,20 +3348,6 @@ function handleYSiteVoice(text, params) {
     showVoiceResult(`سازگاری ${drugDatabase[d1]?.persianName} و ${drugDatabase[d2]?.persianName} بررسی شد`, 'success');
     switchTab('tools');
     setTimeout(() => openAccordionById('ysiteAccordionItem'), 300);
-}
-
-// ---- Show result ----
-function showVoiceResult(message, type = 'success') {
-    const resultEl = voiceResultEl;
-    if (!resultEl) return;
-    resultEl.style.display = 'block';
-    resultEl.className = 'voice-result' + (type === 'error' ? ' error' : '');
-    resultEl.innerHTML = message;
-    if (voiceStatusEl) voiceStatusEl.textContent = type === 'error' ? 'خطا' : 'انجام شد';
-    clearTimeout(voiceTimer);
-    voiceTimer = setTimeout(() => {
-        resultEl.style.display = 'none';
-    }, 12000);
 }
 
 // ---- findDrugName, extractNumberSimple, etc. ----
