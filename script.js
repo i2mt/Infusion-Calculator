@@ -4694,7 +4694,7 @@ function initSwipe() {
         const diffY = Math.abs(touchEndY - touchStartY);
         if (diffX < minHorizontalDistance || diffY > diffX) return;
         const direction = (touchEndX - touchStartX) > 0 ? 'right' : 'left';
-        const tabs = ['calculator', 'drugs', 'tools'];
+        const tabs = ['calculator', 'drugs', 'tools', 'voice'];
         const current = AppState.currentTab;
         let newIndex = tabs.indexOf(current);
         if (direction === 'right') {
