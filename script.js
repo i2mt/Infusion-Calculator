@@ -2650,7 +2650,7 @@ if (!best || best[1] === 0) {
 const cmd = best[0];
 // No confirmation – execute immediately
 executeCommand(cmd, normalized, params);
-
+}
 // ---- Execute command ----
 function executeCommand(cmd, text, params) {
     lastCommand = cmd;
