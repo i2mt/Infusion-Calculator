@@ -1779,6 +1779,58 @@ const TIPS = {
 };
 
 // ============================================
+// VOICE UI FUNCTIONS (hoisted)
+// ============================================
+function renderHistory() {
+    const container = document.getElementById('voiceHistoryList');
+    const historyWrap = document.getElementById('voiceHistory');
+    if (!container) return;
+    if (voiceHistory.length === 0) {
+        if (historyWrap) historyWrap.style.display = 'none';
+        return;
+    }
+    if (historyWrap) historyWrap.style.display = 'block';
+    container.innerHTML = voiceHistory.map(cmd =>
+        `<span class="voice-history-chip" data-cmd="${cmd}">${cmd}</span>`
+    ).join('');
+    container.querySelectorAll('.voice-history-chip').forEach(chip => {
+        chip.addEventListener('click', function() {
+            processTextInput(this.dataset.cmd);
+        });
+    });
+}
+
+function showVoiceResult(message, type = 'success') {
+    const resultEl = voiceResultEl;
+    if (!resultEl) return;
+    resultEl.style.display = 'block';
+    resultEl.className = 'voice-result' + (type === 'error' ? ' error' : '');
+    resultEl.innerHTML = message;
+    if (voiceStatusEl) {
+        voiceStatusEl.textContent = type === 'error' ? 'خطا' : 'انجام شد';
+        voiceStatusEl.className = 'voice-status' + (type === 'error' ? ' error' : ' success');
+    }
+    clearTimeout(voiceTimer);
+    voiceTimer = setTimeout(() => {
+        resultEl.style.display = 'none';
+    }, 12000);
+}
+
+function processTextInput(text) {
+    if (!text) return;
+    addToHistory(text);
+    if (voiceTranscriptEl) {
+        voiceTranscriptEl.textContent = text;
+        voiceTranscriptEl.classList.add('active');
+    }
+    if (voiceStatusEl) {
+        voiceStatusEl.textContent = 'در حال پردازش...';
+        voiceStatusEl.className = 'voice-status processing';
+    }
+    processVoiceCommand(text);
+}
+
+// ============================================
 // HELPER: Open accordion by ID (for voice redirect)
 // ============================================
 function openAccordionById(itemId) {
@@ -1937,12 +1989,12 @@ function setupVoiceTab() {
             voiceHistory = [];
             localStorage.removeItem('voiceHistory');
             renderHistory();
-           window.showVoiceResult('تاریخچه پاک شد', 'info');
+            showVoiceResult('تاریخچه پاک شد', 'info');
         });
     }
 
     // --- Initial history render ---
-    window.renderHistory();
+    renderHistory();
 
     // --- (Optional) Expose the waveform/ring toggling via start/stopVoice ---
     // We'll patch startVoice and stopVoice to manage these UI elements.
