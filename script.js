@@ -2007,13 +2007,12 @@ case 'compat_tool':
     break;
 
 case 'theme':
-    // This should already be caught by the early theme check, but as a fallback:
     const themeMap = {
         'fox': 'fox', 'فاکس': 'fox',
-        'ocean': 'ocean', 'اقیانوس': 'ocean',
-        'rose': 'rose', 'رز': 'rose',
-        'forest': 'forest', 'جنگل': 'forest',
-        'default': 'default', 'پیش‌فرض': 'default'
+        'ocean': 'ocean', 'اقیانوس': 'ocean', 'سایرن': 'ocean',
+        'rose': 'rose', 'رز': 'rose', 'ویکسن': 'rose',
+        'forest': 'forest', 'جنگل': 'forest', 'لینکس': 'forest',
+        'default': 'default', 'پیش‌فرض': 'default', 'هدو': 'default'
     };
     const lowerText = text.toLowerCase();
     let foundTheme = null;
@@ -2729,9 +2728,9 @@ const COMMAND_KEYWORDS = {
         scoreWeight: 0.7
     },
     theme: {
-        triggers: ['فاکس', 'fox', 'اقیانوس', 'ocean', 'رز', 'rose', 'جنگل', 'forest', 'پیش‌فرض', 'default', 'تم فاکس', 'تم اقیانوس', 'تم رز', 'تم جنگل', 'theme fox', 'theme ocean', 'theme rose', 'theme forest'],
-        scoreWeight: 0.9
-    },
+    triggers: ['فاکس', 'fox', 'اقیانوس', 'ocean', 'رز', 'rose', 'جنگل', 'forest', 'پیش‌فرض', 'default', 'تم فاکس', 'تم اقیانوس', 'تم رز', 'تم جنگل', 'theme fox', 'theme ocean', 'theme rose', 'theme forest', 'هدو', 'سایرن', 'لینکس', 'ویکسن'],
+    scoreWeight: 0.9
+},
 
     // ── Help ──────────────────────────────────────────────────────
     help: {
