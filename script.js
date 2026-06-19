@@ -2157,9 +2157,7 @@ function setupVoiceTab() {
         voiceMicBtn = newBtn;
 
         voiceMicBtn.addEventListener('click', function() {
-    alert('Mic button clicked!');
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-    alert('isIOS: ' + isIOS);
 
     if (voiceActive) {
         if (isIOS) {
@@ -2399,32 +2397,30 @@ let voskLoading = false;
 const VOSK_MODEL_URL = 'https://alphacephei.com/vosk/models/vosk-model-small-fa-0.5.zip';
 
 async function startVosk() {
-    console.log('🔵 startVosk() called');
-
-    if (voiceActive) {
-        console.log('⚠️ Voice already active, returning');
-        return;
-    }
+    if (voiceActive) return;
     if (voskLoading) {
-        console.log('⏳ Vosk already loading');
-        showToast('در حال بارگذاری', 'مدل صوتی در حال آماده‌سازی... لطفاً صبر کنید.', 'info');
+        if (voiceStatusEl) {
+            voiceStatusEl.textContent = '⏳ در حال بارگذاری مدل... لطفاً صبر کنید';
+            voiceStatusEl.className = 'voice-status processing';
+        }
         return;
     }
 
     if (typeof Vosk === 'undefined') {
-        console.error('❌ Vosk library not loaded');
         showToast('خطا', 'کتابخانه Vosk بارگذاری نشد', 'error');
+        if (voiceStatusEl) {
+            voiceStatusEl.textContent = '❌ Vosk library not loaded';
+            voiceStatusEl.className = 'voice-status error';
+        }
         return;
     }
-    console.log('✅ Vosk library found');
 
-    // Get DOM elements once (global fallback)
+    // Get DOM elements
     const statusEl = voiceStatusEl || document.getElementById('voiceStatus');
     const transcriptEl = voiceTranscriptEl || document.getElementById('voiceTranscript');
 
     try {
         voskLoading = true;
-        console.log('📥 Starting model download from:', VOSK_MODEL_URL);
 
         // --- Show loading indicator ---
         showToast('در حال بارگذاری', 'دانلود مدل صوتی (۳۰ مگابایت)...', 'info');
@@ -2438,12 +2434,8 @@ async function startVosk() {
         }
 
         // --- Load the model ---
-        console.log('⏳ Calling Vosk.createModel()...');
         voskModel = await Vosk.createModel(VOSK_MODEL_URL);
-        console.log('✅ Model loaded successfully');
-
         voskRecognizer = new Vosk.Recognizer(voskModel, 16000);
-        console.log('✅ Recognizer created');
 
         voskLoading = false;
         showToast('آماده', 'مدل صوتی بارگذاری شد.', 'success');
@@ -2454,10 +2446,7 @@ async function startVosk() {
         }
 
         // --- Get microphone ---
-        console.log('🎤 Requesting microphone...');
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        console.log('✅ Microphone granted');
-
         voskAudioContext = new (window.AudioContext || window.webkitAudioContext)();
         const source = voskAudioContext.createMediaStreamSource(stream);
 
@@ -2488,7 +2477,6 @@ async function startVosk() {
                         transcriptEl.classList.add('active');
                     }
                     if (result.final) {
-                        console.log('✅ Final result:', text);
                         stopVosk();
                         addToHistory(text);
                         processVoiceCommand(text);
@@ -2517,21 +2505,21 @@ async function startVosk() {
             voiceResultEl.className = 'voice-result';
             voiceResultEl.innerHTML = '';
         }
-        console.log('✅ Listening...');
 
     } catch (e) {
-        console.error('❌ Vosk error:', e);
+        console.error('Vosk error:', e);
         voskLoading = false;
         let msg = 'مشکل در راه‌اندازی Vosk';
         if (e.message) msg += ': ' + e.message;
         showToast('خطا', msg, 'error');
         if (statusEl) {
-            statusEl.textContent = '❌ خطا: ' + (e.message || 'مشکل نامشخص');
+            statusEl.textContent = '❌ ' + (e.message || 'مشکل نامشخص');
             statusEl.className = 'voice-status error';
         }
         stopVosk();
     }
 }
+    
 function stopVosk() {
     voiceActive = false;
     if (voskInterval) {
