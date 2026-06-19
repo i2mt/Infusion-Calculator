@@ -9981,7 +9981,7 @@ input[style*="display:none"] {
     color: var(--text-tertiary);
     opacity: 0.8;
 }
-.voice-text-send {
+#voiceTextSend {
     width: 50px;
     height: 50px;
     border-radius: 50%;
@@ -9998,10 +9998,10 @@ input[style*="display:none"] {
     flex-shrink: 0;
     box-shadow: 0 4px 16px rgba(102, 126, 234, 0.35);
 }
-.voice-text-send:hover {
+#voiceTextSend:hover {
     transform: scale(1.06);
 }
-.voice-text-send:active {
+#voiceTextSend:active {
     transform: scale(0.92);
 }
 .voice-text-hint {
