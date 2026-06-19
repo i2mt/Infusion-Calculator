@@ -2961,6 +2961,7 @@ if (params.volume !== undefined) {
         showVoiceResult('دوز مشخص نشد. لطفاً مقدار دوز را بگویید.', 'error');
         return;
     }
+}
 // ---- Drug Info ----
 function handleDrugInfo(text, params) {
     const drugId = params.drugId || findDrugName(text);
