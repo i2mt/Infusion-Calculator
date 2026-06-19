@@ -2045,8 +2045,6 @@ case 'theme':
         }, 1500);
     }
 }
-}   // closes executeCommand
-}   // <-- ADD THIS LINE: closes processVoiceCommand
 // ============================================
 // HANDLER FUNCTIONS
 // ============================================
@@ -2877,7 +2875,7 @@ if (!best || best[1] === 0) {
 const cmd = best[0];
 // No confirmation – execute immediately
 executeCommand(cmd, normalized, params);
-
+}
 
 // ============================================
 // HANDLER FUNCTIONS (implement all tools)
