@@ -1801,7 +1801,7 @@ function renderHistory() {
 }
 
 function showVoiceResult(message, type = 'success') {
-    const resultEl = voiceResultEl;
+        const resultEl = document.getElementById('voiceResult') || voiceResultEl;
     if (!resultEl) return;
     resultEl.style.display = 'block';
     resultEl.className = 'voice-result' + (type === 'error' ? ' error' : '');
@@ -3680,8 +3680,11 @@ function calculateManualInfusion() {
 // TAB MANAGEMENT
 // ============================================
 function switchTab(tabName) {
-    DOM.tabItems.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
-    DOM.tabPanes.forEach(pane => {
+    const tabItems = document.querySelectorAll('.tab-item');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabItems.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+    tabPanes.forEach(pane => {
         const isActive = pane.id === tabName + 'Tab';
         pane.classList.toggle('active', isActive);
         pane.style.display = isActive ? 'block' : 'none';
