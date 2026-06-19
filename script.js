@@ -1490,3 +1490,5323 @@ function setupEventListeners() {
             haptic(25);
             AppState.useWeight = !AppState.useWeight;
             if (DOM.weightCheckbox) DOM.weightCheckbox.checked = AppState.useWeight;
+            DOM.weightIosToggle.classList.toggle('on', AppState.useWeight);
+            if (DOM.weightInputRow) {
+                DOM.weightInputRow.style.display = AppState.useWeight ? 'flex' : 'none';
+            }
+            if (DOM.patientWeight) {
+                DOM.patientWeight.disabled = !AppState.useWeight;
+                if (AppState.useWeight) setTimeout(() => DOM.patientWeight.focus(), 150);
+            }
+            const drug = drugDatabase[AppState.selectedDrug];
+            updateWeightBasedUnit(drug);
+            clearResults();
+        });
+    }
+
+    if (DOM.weightCheckbox && DOM.patientWeight) {
+        DOM.weightCheckbox.addEventListener('change', function() {
+            AppState.useWeight = this.checked;
+            DOM.patientWeight.disabled = !this.checked;
+            if (DOM.weightIosToggle) DOM.weightIosToggle.classList.toggle('on', this.checked);
+            if (DOM.weightInputRow) DOM.weightInputRow.style.display = this.checked ? 'flex' : 'none';
+            const drug = drugDatabase[AppState.selectedDrug];
+            updateWeightBasedUnit(drug);
+            if (this.checked && DOM.patientWeight) DOM.patientWeight.focus();
+            clearResults();
+        });
+    }
+    if (DOM.customVolume) {
+        DOM.customVolume.setAttribute('inputmode', 'numeric');
+        DOM.customVolume.setAttribute('pattern', '[0-9]*');
+        DOM.customVolume.style.textAlign = 'center';
+    }
+    if (DOM.calculateBtn) DOM.calculateBtn.addEventListener('click', () => {
+        haptic(40);
+        if (AppState.reverseMode) calculateReverse();
+        else calculateInfusion();
+    });
+
+    const copyResultBtn = document.getElementById('copyResultBtn');
+    if (copyResultBtn) copyResultBtn.addEventListener('click', () => {
+        const drug = drugDatabase[AppState.selectedDrug];
+        const pumpRate = document.getElementById('pumpRateResult')?.textContent;
+        const concentration = document.getElementById('concentrationResult')?.textContent;
+        const concentrationUnit = document.getElementById('concentrationUnit')?.textContent;
+        const dose = AppState.desiredDose;
+        const unit = drug?.standardUnit || '';
+        const text = `MedCalc Pro\n${drug?.persianName || ''} (${drug?.englishName || ''})\nدوز: ${dose} ${unit}\nغلظت: ${concentration} ${concentrationUnit}\nسرعت پمپ: ${pumpRate} cc/hr`;
+        if (navigator.share) {
+            navigator.share({ title: 'FoxiMed', text }).catch(() => {});
+            haptic(30);
+        } else if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(() => { showToast('کپی شد', 'نتیجه در کلیپ‌بورد کپی شد', 'success'); haptic(20); });
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = text; document.body.appendChild(ta); ta.select();
+            document.execCommand('copy'); document.body.removeChild(ta);
+            showToast('کپی شد', 'نتیجه در کلیپ‌بورد کپی شد', 'success');
+        }
+    });
+
+    if (DOM.doctorOrder) {
+        DOM.doctorOrder.addEventListener('input', () => clearResults());
+        DOM.doctorOrder.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); calculateInfusion(); } });
+    }
+    if (DOM.closeSettings) DOM.closeSettings.addEventListener('click', () => {
+        if (DOM.settingsModal) { DOM.settingsModal.classList.remove('active'); document.body.classList.remove('no-scroll'); }
+    });
+    if (DOM.closeHistory) DOM.closeHistory.addEventListener('click', () => {
+        if (DOM.historyModal) { DOM.historyModal.classList.remove('active'); document.body.classList.remove('no-scroll'); }
+    });
+    if (DOM.drugSearch) DOM.drugSearch.addEventListener('input', function() {
+        const term = this.value.toLowerCase();
+        document.querySelectorAll('.drug-item-compact').forEach(card => {
+            const drugId = card.dataset.drugId;
+            const drug = drugDatabase[drugId];
+            if (!drug) return;
+            const searchText = [drug.persianName, drug.englishName, drug.category, ...(drug.alternativeNames || [])].join(' ').toLowerCase();
+            card.style.display = searchText.includes(term) ? 'flex' : 'none';
+        });
+    });
+    if (DOM.librarySearch) DOM.librarySearch.addEventListener('input', function() {
+        const term = this.value.toLowerCase();
+        document.querySelectorAll('.qref-accordion-item').forEach(card => {
+            const drugName = card.querySelector('.qref-name')?.textContent || '';
+            const englishName = card.querySelector('.qref-english')?.textContent || '';
+            card.style.display = (drugName + ' ' + englishName).toLowerCase().includes(term) ? 'block' : 'none';
+        });
+    });
+    // Reverse mode toggle row
+    const reverseRow = document.querySelector('.reverse-toggle-row');
+    if (reverseRow) {
+        reverseRow.addEventListener('click', (e) => {
+            if (e.target.closest('.help-icon')) return;
+            haptic(30);
+            AppState.reverseMode = !AppState.reverseMode;
+            if (AppState.reverseMode && !localStorage.getItem('reverseTooltipSeen')) {
+                showReverseTooltip();
+            }
+            updateReverseUI();
+            clearResults();
+        });
+    }
+
+    if (DOM.doctorOrder) {
+        DOM.doctorOrder.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); DOM.calculateBtn?.click(); }
+        });
+        DOM.doctorOrder.addEventListener('input', () => {
+            clearResults();
+            updateDoseRangeIndicator();
+        });
+    }
+
+    setupSettingsEventListeners();
+    window.addEventListener('resize', () => setupMobileLayout());
+    document.querySelectorAll('.converter-body input, .tool-body input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const card = input.closest('.converter-card, .tool-card');
+                const button = card?.querySelector('.converter-btn, .tool-btn');
+                if (button) button.click();
+            }
+        });
+    });
+}
+// ============================================
+// SETTINGS EVENT LISTENERS
+// ============================================
+function setupSettingsEventListeners() {
+    // Dark mode toggle (from settings modal)
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    if (darkModeToggle) {
+        darkModeToggle.addEventListener('change', function() {
+            AppState.settings.darkMode = this.checked;
+            AppState.settings.themeMode = this.checked ? 'dark' : 'light';
+            if (DOM.themeModeSelect) DOM.themeModeSelect.value = AppState.settings.themeMode;
+            saveSettings();
+            applySettings();
+        });
+    }
+
+    // Large font toggle
+    const largeFontToggle = document.getElementById('largeFontToggle');
+    if (largeFontToggle) {
+        largeFontToggle.addEventListener('change', function() {
+            AppState.settings.largeFont = this.checked;
+            saveSettings();
+            applySettings();
+        });
+    }
+
+    // Dose alerts
+    const doseAlertToggle = document.getElementById('doseAlertToggle');
+    if (doseAlertToggle) {
+        doseAlertToggle.addEventListener('change', function() {
+            AppState.settings.doseAlerts = this.checked;
+            saveSettings();
+        });
+    }
+
+    // Compatibility alerts
+    const compatAlertToggle = document.getElementById('compatAlertToggle');
+    if (compatAlertToggle) {
+        compatAlertToggle.addEventListener('change', function() {
+            AppState.settings.compatAlerts = this.checked;
+            saveSettings();
+        });
+    }
+
+    // Save history
+    const saveHistoryToggle = document.getElementById('saveHistoryToggle');
+    if (saveHistoryToggle) {
+        saveHistoryToggle.addEventListener('change', function() {
+            AppState.settings.saveHistory = this.checked;
+            saveSettings();
+        });
+    }
+
+    // Clear calculation history (settings modal)
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    if (clearHistoryBtn) {
+        clearHistoryBtn.addEventListener('click', function() {
+            if (confirm('آیا از پاک کردن تاریخچه اطمینان دارید؟')) {
+                localStorage.removeItem('calculationHistory');
+                showToast('تاریخچه پاک شد', 'تمامی محاسبات ذخیره شده حذف شدند.', 'success');
+            }
+        });
+    }
+
+    // Haptic feedback
+    const hapticToggle = document.getElementById('hapticToggle');
+    if (hapticToggle) {
+        hapticToggle.addEventListener('change', function() {
+            AppState.settings.hapticFeedback = this.checked;
+            saveSettings();
+            if (this.checked) haptic(40);
+        });
+    }
+
+    // Export data
+    const exportDataBtn = document.getElementById('exportDataBtn');
+    if (exportDataBtn) {
+        exportDataBtn.addEventListener('click', exportHistory);
+    }
+
+    // Theme mode dropdown (if still present – fallback)
+    const themeModeSelect = document.getElementById('themeModeSelect');
+    if (themeModeSelect) {
+        themeModeSelect.addEventListener('change', function() {
+            AppState.settings.themeMode = this.value;
+            saveSettings();
+            applyThemeMode();
+            if (DOM.darkModeToggle) DOM.darkModeToggle.checked = AppState.settings.darkMode;
+        });
+    }
+
+    // Theme mode 3-button row
+    const themeBtns = document.querySelectorAll('#themeModeButtons .theme-mode-btn');
+    themeBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            AppState.settings.themeMode = this.dataset.mode;
+            saveSettings();
+            applyThemeMode();
+            syncThemeModeButtons();
+        });
+    });
+
+    // Check for updates
+    const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+    if (checkUpdateBtn) {
+        checkUpdateBtn.addEventListener('click', async function() {
+            this.disabled = true;
+            const origHTML = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> در حال بررسی...';
+            try {
+                const reg = await navigator.serviceWorker.getRegistration();
+                if (reg) {
+                    await reg.update();
+                    if (reg.waiting) {
+                        showUpdateBanner();
+                    } else {
+                        showToast('بروز است', 'شما آخرین نسخه FoxiMed را دارید', 'success');
+                    }
+                }
+            } catch(e) {
+                showToast('خطا', 'بررسی به‌روزرسانی ممکن نشد', 'error');
+            }
+            setTimeout(() => { this.disabled = false; this.innerHTML = origHTML; }, 1500);
+        });
+    }
+}
+
+// ============================================
+// VOICE ASSISTANT — ENHANCED EDITION
+// ============================================
+
+let voiceActive = false;
+let recognition = null;
+let voiceTranscriptEl = null;
+let voiceStatusEl = null;
+let voiceResultEl = null;
+let voiceMicBtn = null;
+let voiceTimer = null;
+let voiceHistory = JSON.parse(localStorage.getItem('voiceHistory') || '[]');
+let lastCommand = null;
+let lastParams = null;
+let pendingConfirm = null;
+let confirmResolve = null;
+
+const TIPS = {
+    bmi: '💡 همچنین می‌توانید BSA (سطح بدن) را با گفتن "BSA وزن ۷۰ قد ۱۷۰" محاسبه کنید.',
+    bsa: '💡 برای BMI بگویید "BMI وزن ۷۵ قد ۱۷۵".',
+    crcl: '💡 می‌توانید جنسیت را هم مشخص کنید: "زن" یا "مرد".',
+    drip: '💡 نوع ست را هم می‌توانید بگویید: "ماکروست" یا "میکروست".',
+    convert: '💡 عناصر پشتیبانی‌شده: سدیم، پتاسیم، کلسیم، منیزیم، بی‌کربنات.',
+    drug: '💡 می‌توانید روش تزریق، حجم محلول، تعداد آمپول و مقدار دلخواه را هم مشخص کنید.',
+    gcs: '💡 برای RASS بگویید "RASS 2" یا "RASS -3".',
+    rass: '💡 برای GCS بگویید "GCS 4 5 6".',
+    braden: '💡 مقیاس برادن ۶ بخش دارد: حس، رطوبت، فعالیت، تحرک، تغذیه، اصطکاک.',
+    morse: '💡 مقیاس مورس ۶ بخش دارد: سابقه سقوط، تشخیص ثانویه، وسیله کمکی، IV، راه رفتن، وضعیت ذهنی.',
+    burns: '💡 روی نواحی سوختگی در تصویر کلیک کنید – بزرگسال یا کودک را انتخاب کنید.',
+    oxygen: '💡 فرمول: حجم کپسول (لیتر) × فشار (بار) × ۰.۹ / جریان (L/min) = مدت (دقیقه).',
+    vbg: '💡 برای VBG می‌توانید Na, Cl, آلبومین را هم برای آنیون گپ وارد کنید.',
+    ventilator: '💡 همچنین می‌توانید از طول اولنا برای تخمین قد استفاده کنید.',
+    nutrition: '💡 ضریب استرس را می‌توانید با گفتن "سپسیس" یا "سوختگی" تنظیم کنید.',
+    ysite: '💡 دو دارو را انتخاب کنید تا سازگاری Y‑Site را بررسی کنید.',
+};
+
+// ============================================
+// VOICE UI FUNCTIONS (hoisted)
+// ============================================
+function renderHistory() {
+    const container = document.getElementById('voiceHistoryList');
+    const historyWrap = document.getElementById('voiceHistory');
+    if (!container) return;
+    if (voiceHistory.length === 0) {
+        if (historyWrap) historyWrap.style.display = 'none';
+        return;
+    }
+    if (historyWrap) historyWrap.style.display = 'block';
+    container.innerHTML = voiceHistory.map(cmd =>
+        `<span class="voice-history-chip" data-cmd="${cmd}">${cmd}</span>`
+    ).join('');
+    container.querySelectorAll('.voice-history-chip').forEach(chip => {
+        chip.addEventListener('click', function() {
+            processTextInput(this.dataset.cmd);
+        });
+    });
+}
+
+function showVoiceResult(message, type = 'success') {
+        const resultEl = document.getElementById('voiceResult') || voiceResultEl;
+    if (!resultEl) return;
+    resultEl.style.display = 'block';
+    resultEl.className = 'voice-result' + (type === 'error' ? ' error' : '');
+    resultEl.innerHTML = message;
+    if (voiceStatusEl) {
+        voiceStatusEl.textContent = type === 'error' ? 'خطا' : 'انجام شد';
+        voiceStatusEl.className = 'voice-status' + (type === 'error' ? ' error' : ' success');
+    }
+    clearTimeout(voiceTimer);
+    voiceTimer = setTimeout(() => {
+        resultEl.style.display = 'none';
+    }, 12000);
+}
+
+function processTextInput(text) {
+    if (!text) return;
+    addToHistory(text);
+    if (voiceTranscriptEl) {
+        voiceTranscriptEl.textContent = text;
+        voiceTranscriptEl.classList.add('active');
+    }
+    if (voiceStatusEl) {
+        voiceStatusEl.textContent = 'در حال پردازش...';
+        voiceStatusEl.className = 'voice-status processing';
+    }
+    processVoiceCommand(text);
+}
+
+// ============================================
+// HELPER: Open accordion by ID (for voice redirect)
+// ============================================
+function openAccordionById(itemId) {
+    const item = document.getElementById(itemId);
+    if (!item) return;
+    // If already open, do nothing
+    if (item.classList.contains('open')) return;
+
+    // Close any other open accordion
+    document.querySelectorAll('.accordion-item.open').forEach(openItem => {
+        if (openItem !== item) {
+            openItem.classList.remove('open');
+            const body = openItem.querySelector('.accordion-body');
+            if (body) {
+                body.style.maxHeight = '0';
+                body.style.padding = '0';
+            }
+            const chev = openItem.querySelector('.accordion-chevron');
+            if (chev) chev.style.transform = '';
+        }
+    });
+
+    // Open this one
+    item.classList.add('open');
+    const body = item.querySelector('.accordion-body');
+    if (body) {
+        body.style.maxHeight = body.scrollHeight + 2000 + 'px';
+        body.style.padding = '0 0 14px';
+    }
+    const chevron = item.querySelector('.accordion-chevron');
+    if (chevron) chevron.style.transform = 'rotate(180deg)';
+    haptic(20);
+    setTimeout(() => item.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+}
+// ============================================
+// HELPER: Open accordion containing a tool result
+// ============================================
+function openAccordionForTool(resultElementId, fallbackItemId) {
+    const resultEl = document.getElementById(resultElementId);
+    if (resultEl) {
+        const item = resultEl.closest('.accordion-item');
+        if (item) {
+            const body = item.querySelector('.accordion-body');
+            if (body && body.id) {
+                toggleAccordionById(body.id);
+                return true;
+            }
+        }
+    }
+    if (fallbackItemId) {
+        const item = document.getElementById(fallbackItemId);
+        if (item && item.classList.contains('accordion-item')) {
+            const body = item.querySelector('.accordion-body');
+            if (body && body.id) {
+                toggleAccordionById(body.id);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+// ============================================
+// INITIALISE VOICE TAB (Lazy)
+// ============================================
+// ============================================
+// VOICE ASSISTANT — UI SETUP (Apple‑inspired)
+// ============================================
+function setupVoiceTab() {
+    // --- DOM references (new IDs match the redesigned HTML) ---
+    voiceMicBtn = document.getElementById('voiceMicBtn');
+    voiceTranscriptEl = document.getElementById('voiceTranscript');
+    voiceStatusEl = document.getElementById('voiceStatus');
+    voiceResultEl = document.getElementById('voiceResult');
+    const voiceWaveform = document.getElementById('voiceWaveform');
+    const ringContainer = document.querySelector('.voice-ring-container');
+    const voiceTextInput = document.getElementById('voiceTextInput');
+    const voiceTextSend = document.getElementById('voiceTextSend');
+    const voiceClearHistoryBtn = document.getElementById('voiceClearHistoryBtn');
+    const voiceHistoryList = document.getElementById('voiceHistoryList');
+    const voiceHistoryWrap = document.getElementById('voiceHistory');
+
+    // --- Ensure initial UI states ---
+    if (voiceWaveform) voiceWaveform.classList.remove('active');
+    if (ringContainer) ringContainer.classList.remove('recording');
+    if (voiceStatusEl) voiceStatusEl.textContent = 'برای شروع، دکمه را بزنید';
+    if (voiceTranscriptEl) {
+        voiceTranscriptEl.textContent = '…';
+        voiceTranscriptEl.classList.remove('active');
+    }
+    if (voiceResultEl) {
+        voiceResultEl.style.display = 'none';
+        voiceResultEl.className = 'voice-result';
+        voiceResultEl.innerHTML = '';
+    }
+
+    // --- Mic button: start/stop listening ---
+    if (voiceMicBtn) {
+        // Remove any existing listeners to avoid duplicates
+        const newBtn = voiceMicBtn.cloneNode(true);
+        voiceMicBtn.parentNode.replaceChild(newBtn, voiceMicBtn);
+        voiceMicBtn = newBtn;
+
+        voiceMicBtn.addEventListener('click', function() {
+            if (voiceActive) {
+                stopVoice();
+            } else {
+                startVoice();
+            }
+        });
+    }
+
+    // --- Example chips ---
+    document.querySelectorAll('.example-chip').forEach(chip => {
+        // Remove old listeners by cloning
+        const newChip = chip.cloneNode(true);
+        chip.parentNode.replaceChild(newChip, chip);
+        newChip.addEventListener('click', function() {
+            const cmd = this.dataset.command;
+            if (cmd) {
+                if (voiceTranscriptEl) {
+                    voiceTranscriptEl.textContent = cmd;
+                    voiceTranscriptEl.classList.add('active');
+                }
+                processTextInput(cmd);
+            }
+        });
+    });
+
+    // --- Text fallback: send button ---
+    if (voiceTextSend && voiceTextInput) {
+        const newSend = voiceTextSend.cloneNode(true);
+        voiceTextSend.parentNode.replaceChild(newSend, voiceTextSend);
+        newSend.addEventListener('click', function() {
+            const cmd = voiceTextInput.value.trim();
+            if (cmd) {
+                processTextInput(cmd);
+                voiceTextInput.value = '';
+            }
+        });
+        // Also handle Enter key
+        const newInput = voiceTextInput.cloneNode(true);
+        voiceTextInput.parentNode.replaceChild(newInput, voiceTextInput);
+        newInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                newSend.click();
+            }
+        });
+    }
+
+    // --- Clear history ---
+    if (voiceClearHistoryBtn) {
+        const newClear = voiceClearHistoryBtn.cloneNode(true);
+        voiceClearHistoryBtn.parentNode.replaceChild(newClear, voiceClearHistoryBtn);
+        newClear.addEventListener('click', function() {
+            voiceHistory = [];
+            localStorage.removeItem('voiceHistory');
+            renderHistory();
+            showVoiceResult('تاریخچه پاک شد', 'info');
+        });
+    }
+
+    // --- Initial history render ---
+    renderHistory();
+
+    // --- (Optional) Expose the waveform/ring toggling via start/stopVoice ---
+    // We'll patch startVoice and stopVoice to manage these UI elements.
+    // But we need to keep the original functions; we can override them or enhance.
+    // Let's override with enhanced versions that also handle the new UI.
+
+    // Save original functions if needed, but we'll redefine them here.
+    // We'll use the ones defined globally, but we need to add the UI updates.
+    // We'll just extend them; the global functions already exist, but we can
+    // add the ring/waveform updates inside startVoice and stopVoice.
+
+    // However, since startVoice/stopVoice are already defined elsewhere,
+    // we can safely modify them to include the new UI. But to avoid duplication,
+    // we'll overwrite them with enhanced versions that call the original logic.
+    // Actually, the original logic is inside the global functions; we can just
+    // patch them by adding the UI updates. Since they are global, we can
+    // redefine them here or override.
+
+    // To keep it clean, I'll redefine startVoice and stopVoice here.
+    // (They will replace the global ones, which is fine as long as we keep
+    // the same logic plus the UI updates.)
+}
+
+// ============================================
+// ENHANCED startVoice / stopVoice (with new UI)
+// ============================================
+
+// Override the global startVoice with enhanced version that includes ring/waveform
+const originalStartVoice = window.startVoice || function() {};
+window.startVoice = function() {
+    if (voiceActive) return;
+    // Lazy init recognition (same as original)
+    if (!recognition) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            showToast('خطا', 'مرورگر شما از تشخیص صدا پشتیبانی نمی‌کند', 'error');
+            return;
+        }
+        recognition = new SpeechRecognition();
+        recognition.lang = 'fa-IR';
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+
+        let finalTranscript = '';
+        recognition.onresult = function(event) {
+    let interim = '';
+    let finalTranscript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+        } else {
+            interim += transcript;
+        }
+    }
+    const displayText = finalTranscript || interim;
+    if (voiceTranscriptEl) {
+        voiceTranscriptEl.textContent = displayText || '...';
+        voiceTranscriptEl.classList.add('active');
+    }
+    if (voiceStatusEl) {
+        voiceStatusEl.textContent = finalTranscript ? 'در حال پردازش...' : 'گوش می‌کنم...';
+        voiceStatusEl.className = 'voice-status processing';
+    }
+    if (event.results[event.results.length - 1].isFinal) {
+        const command = finalTranscript.trim();
+        if (command) {
+            // Directly process the voice command (skip processTextInput double-call)
+            addToHistory(command);
+            processVoiceCommand(command);
+        }
+        finalTranscript = '';
+        stopVoice();
+    }
+};
+
+        recognition.onerror = function(event) {
+            console.warn('Voice error:', event.error);
+            let msg = 'خطا در تشخیص صدا';
+            if (event.error === 'not-allowed') msg = 'دسترسی به میکروفون داده نشد';
+            else if (event.error === 'no-speech') msg = 'صدایی تشخیص داده نشد';
+            else if (event.error === 'audio-capture') msg = 'میکروفون در دسترس نیست';
+            if (voiceStatusEl) {
+                voiceStatusEl.textContent = msg;
+                voiceStatusEl.className = 'voice-status error';
+            }
+            stopVoice();
+            showToast('خطا', msg, 'error');
+        };
+
+        recognition.onend = function() {
+            // nothing
+        };
+    }
+
+    voiceActive = true;
+    voiceMicBtn.classList.add('recording');
+    const ring = document.querySelector('.voice-ring-container');
+    if (ring) ring.classList.add('recording');
+    const wave = document.getElementById('voiceWaveform');
+    if (wave) wave.classList.add('active');
+    if (voiceStatusEl) {
+        voiceStatusEl.textContent = 'گوش می‌کنم...';
+        voiceStatusEl.className = 'voice-status recording';
+    }
+    if (voiceTranscriptEl) {
+        voiceTranscriptEl.textContent = '';
+        voiceTranscriptEl.classList.remove('active');
+    }
+    if (voiceResultEl) {
+        voiceResultEl.style.display = 'none';
+        voiceResultEl.className = 'voice-result';
+        voiceResultEl.innerHTML = '';
+    }
+    try {
+        recognition.start();
+    } catch (e) {
+        console.warn('Voice start error:', e);
+        showToast('خطا', 'دسترسی به میکروفون داده نشد یا مشکلی وجود دارد', 'error');
+        stopVoice();
+    }
+};
+
+// Override stopVoice to clean UI
+const originalStopVoice = window.stopVoice || function() {};
+window.stopVoice = function() {
+    voiceActive = false;
+    voiceMicBtn.classList.remove('recording');
+    const ring = document.querySelector('.voice-ring-container');
+    if (ring) ring.classList.remove('recording');
+    const wave = document.getElementById('voiceWaveform');
+    if (wave) wave.classList.remove('active');
+    if (voiceStatusEl && !voiceStatusEl.textContent.includes('پردازش')) {
+        voiceStatusEl.textContent = 'برای شروع، دکمه را بزنید';
+        voiceStatusEl.className = 'voice-status';
+    }
+    if (recognition) {
+        try { recognition.stop(); } catch (e) {}
+    }
+};
+
+// ============================================
+// COMMAND HISTORY
+// ============================================
+function addToHistory(text) {
+    voiceHistory = voiceHistory.filter(cmd => cmd !== text);
+    voiceHistory.unshift(text);
+    if (voiceHistory.length > 10) voiceHistory.pop();
+    localStorage.setItem('voiceHistory', JSON.stringify(voiceHistory));
+    renderHistory();
+}
+
+// ============================================
+// CONFIRMATION OVERLAY
+// ============================================
+function confirmCommand(parsedText, params) {
+    return new Promise((resolve) => {
+        pendingConfirm = { resolve, params };
+        const overlay = document.getElementById('voiceConfirmOverlay');
+        const textEl = document.getElementById('voiceConfirmText');
+        if (!overlay || !textEl) { resolve(true); return; }
+        textEl.textContent = `دستور: "${parsedText}"\nآیا این درست است؟`;
+        overlay.style.display = 'flex';
+        document.getElementById('voiceConfirmYes').onclick = () => {
+            overlay.style.display = 'none';
+            resolve(true);
+        };
+        document.getElementById('voiceConfirmNo').onclick = () => {
+            overlay.style.display = 'none';
+            resolve(false);
+        };
+        // Auto‑dismiss after 10s
+        setTimeout(() => {
+            if (overlay.style.display !== 'none') {
+                overlay.style.display = 'none';
+                resolve(true); // assume yes if no answer
+            }
+        }, 10000);
+    });
+}
+
+// ============================================
+// ENHANCED MAIN COMMAND PARSER
+// ============================================
+
+function extractParams(text) {
+    const params = {};
+    let lower = text.toLowerCase();
+
+    // --- Ranges ---
+    const rangeMatch = text.match(/(?:between|از)\s*(\d+(?:\.\d+)?)\s*(?:and|تا)\s*(\d+(?:\.\d+)?)/i);
+    if (rangeMatch) {
+        params.rangeMin = parseFloat(rangeMatch[1]);
+        params.rangeMax = parseFloat(rangeMatch[2]);
+    }
+
+    // --- Negations ---
+    if (text.includes('not using') || text.includes('بدون') || text.includes('غیرفعال')) {
+        params.negated = true;
+    }
+
+    // --- Time expressions ---
+    const timeMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:hour|hr|ساعت|h)/i);
+    if (timeMatch) params.time = parseFloat(timeMatch[1]);
+    const freqMatch = text.match(/q(\d+)(h|hr)/i);
+    if (freqMatch) params.frequency = parseInt(freqMatch[1]);
+
+    // --- Drug concentration (e.g., "500 mg in 250 mL") ---
+    const concMatch = text.match(/(\d+(?:\.\d+)?)\s*(mg|mcg|g|units)\s+(?:in|در)\s+(\d+(?:\.\d+)?)\s*(ml|mL|cc)/i);
+    if (concMatch) {
+        params.concAmount = parseFloat(concMatch[1]);
+        params.concUnit = concMatch[2];
+        params.concVolume = parseFloat(concMatch[3]);
+        params.concVolUnit = concMatch[4];
+    }
+
+    // --- ENHANCED: Extract weight (Persian & English) ---
+    const weightPatterns = [
+        /(?:وزن|وزنش|وزن بیمار|weight)\s*(\d+(?:\.\d+)?)\s*(?:kg|کیلوگرم|کیلو)?/i,
+        /(\d+(?:\.\d+)?)\s*(?:kg|کیلوگرم|کیلو)(?:\s*وزن)?/i,
+        /weight\s*(\d+(?:\.\d+)?)\s*(?:kg)?/i,
+    ];
+    for (const pattern of weightPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+            params.weight = parseFloat(match[1]);
+            text = text.replace(match[0], '');
+            break;
+        }
+    }
+
+    // --- ENHANCED: Extract height (Persian & English) ---
+    const heightPatterns = [
+        /(?:قد|قدش|قد بیمار|height)\s*(\d+(?:\.\d+)?)\s*(?:cm|سانتی‌متر|سانت)?/i,
+        /(\d+(?:\.\d+)?)\s*(?:cm|سانتی‌متر|سانت)(?:\s*قد)?/i,
+        /height\s*(\d+(?:\.\d+)?)\s*(?:cm)?/i,
+    ];
+    for (const pattern of heightPatterns) {
+        const match = text.match(pattern);
+        if (match) {
+            params.height = parseFloat(match[1]);
+            text = text.replace(match[0], '');
+            break;
+        }
+    }
+
+    // --- Generic numbers with units ---
+    const patterns = [
+        { regex: /(\d+(?:\.\d+)?)\s*(yr|سال|age)/i, key: 'age' },
+        { regex: /(\d+(?:\.\d+)?)\s*(ml|mL|cc|سی‌سی)/i, key: 'volume' },
+        { regex: /(\d+(?:\.\d+)?)\s*(mg|mcg|g|units)/i, key: 'dose' },
+        { regex: /(\d+(?:\.\d+)?)\s*(meq|mEq)/i, key: 'meq' },
+        { regex: /(\d+(?:\.\d+)?)\s*(bar|psi|mmhg|cmh2o|kpa)/i, key: 'pressure' },
+        { regex: /(\d+(?:\.\d+)?)\s*(L|litre|لیتر)/i, key: 'liters' },
+        { regex: /(\d+(?:\.\d+)?)\s*(%|percent|درصد)/i, key: 'percent' },
+        { regex: /(\d+(?:\.\d+)?)\s*(eye|چشمی)\s*(\d+)/i, key: 'gcs_eye' },
+        { regex: /(\d+(?:\.\d+)?)\s*(verbal|کلامی)\s*(\d+)/i, key: 'gcs_verbal' },
+        { regex: /(\d+(?:\.\d+)?)\s*(motor|حرکتی)\s*(\d+)/i, key: 'gcs_motor' },
+    ];
+    patterns.forEach(p => {
+        const match = text.match(p.regex);
+        if (match) {
+            if (p.key.startsWith('gcs_')) {
+                params[p.key] = parseInt(match[2] || match[1]);
+            } else {
+                params[p.key] = parseFloat(match[1]);
+                text = text.replace(match[0], '');
+            }
+        }
+    });
+
+    // --- GCS without labels ---
+    if (!params.gcs_eye && !params.gcs_verbal && !params.gcs_motor) {
+        const gcsNums = text.match(/(?:gcs|گلاسکو)\s*(\d+)\s*(\d+)\s*(\d+)/i);
+        if (gcsNums) {
+            params.gcs_eye = parseInt(gcsNums[1]);
+            params.gcs_verbal = parseInt(gcsNums[2]);
+            params.gcs_motor = parseInt(gcsNums[3]);
+        }
+    }
+
+    // --- Gender ---
+    if (text.includes('male') || text.includes('مرد')) params.gender = 'male';
+    else if (text.includes('female') || text.includes('زن')) params.gender = 'female';
+
+    // --- Drug ---
+    const drugId = findDrugName(text);
+    if (drugId) params.drugId = drugId;
+
+    // --- Solution ---
+    if (text.includes('ns') || text.includes('سالین')) params.solution = 'N.S';
+    else if (text.includes('d5w') || text.includes('دکستروز')) params.solution = 'D5W';
+
+    // --- Method ---
+    if (text.includes('سرنگ')) params.method = 'syringe';
+    else if (text.includes('انفوزیون') || text.includes('پمپ')) params.method = 'infusion';
+
+    // --- Ampoules ---
+    const ampMatch = text.match(/آمپول\s*(\d+)/i);
+    if (ampMatch) params.ampoules = parseInt(ampMatch[1]);
+
+    // --- Custom amount ---
+    const customMatch = text.match(/(دلخواه|مقدار)\s*(\d+(?:\.\d+)?)\s*(units|mg|mcg|g)/i);
+    if (customMatch) {
+        params.customAmount = parseFloat(customMatch[2]);
+        params.customUnit = customMatch[3].toLowerCase();
+    }
+
+    // --- Oxygen flow ---
+    const flowMatch = text.match(/(\d+(?:\.\d+)?)\s*(L\/min|litre\/min|لیتر در دقیقه)/i);
+    if (flowMatch) params.flow = parseFloat(flowMatch[1]);
+
+    // --- Electrolyte ---
+    const elemMap = {
+        'sodium': 'sodium',
+        'potassium': 'potassium',
+        'calcium': 'calcium',
+        'magnesium': 'magnesium',
+        'bicarbonate': 'sodium_bicarbonate',
+        'sodium bicarbonate': 'sodium_bicarbonate'
+    };
+    for (const [key, val] of Object.entries(elemMap)) {
+        if (text.includes(key)) {
+            params.electrolyte = val;
+            break;
+        }
+    }
+
+    // --- Two drugs for Y-Site ---
+    const twoDrugs = text.match(/(\w+)\s+(?:and|و)\s+(\w+)/i);
+    if (twoDrugs) {
+        const d1 = findDrugName(twoDrugs[1]);
+        const d2 = findDrugName(twoDrugs[2]);
+        if (d1 && d2) {
+            params.drug1 = d1;
+            params.drug2 = d2;
+        }
+    }
+
+    // --- RASS score ---
+    const rassMatch = text.match(/rass\s*([+-]?\d+)/i);
+    if (rassMatch) params.rassScore = parseInt(rassMatch[1]);
+
+    // --- Braden scores (6 numbers) ---
+    const bradenMatch = text.match(/برادن\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)/i);
+    if (bradenMatch) {
+        params.bradenScores = bradenMatch.slice(1,7).map(Number);
+    }
+
+    // --- Morse scores (6 numbers) ---
+    const morseMatch = text.match(/مورس\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*(\d+)/i);
+    if (morseMatch) {
+        params.morseScores = morseMatch.slice(1,7).map(Number);
+    }
+
+    // --- Store original text for debugging ---
+    params._original = text;
+
+    return params;
+}
+
+// --- Command scoring (with settings and all tools) ---
+const COMMAND_KEYWORDS = {
+    // ── Navigation ────────────────────────────────────────────────
+    tab_calculator: {
+        triggers: ['ماشین حساب', 'محاسبه‌گر', 'تب محاسبه', 'برگه محاسبه', 'بخش محاسبه', 'calculator tab', 'go to calculator', 'ماشین‌حساب'],
+        scoreWeight: 0.7
+    },
+    tab_drugs: {
+        triggers: ['مرجع داروها', 'کتابخانه دارو', 'لیست داروها', 'داروخانه', 'drug library', 'drugs tab', 'رفتن به داروها'],
+        scoreWeight: 0.7
+    },
+    tab_tools: {
+        triggers: ['ابزارها', 'تب ابزار', 'ابزارهای بالینی', 'tools tab', 'رفتن به ابزارها', 'ابزارک‌ها'],
+        scoreWeight: 0.7
+    },
+
+    // ── Actions ────────────────────────────────────────────────────
+    clear: {
+        triggers: ['پاک کن', 'پاک کردن', 'صفر', 'clear results', 'reset', 'پاکسازی', 'حذف نتایج'],
+        scoreWeight: 0.8
+    },
+    manual_calc: {
+        triggers: ['محاسبه دستی', 'دستی', 'manual calculation', 'custom calculation', 'محاسبه بدون دارو', 'محاسبه دلخواه'],
+        scoreWeight: 0.9
+    },
+    history: {
+        triggers: ['تاریخچه', 'محاسبات قبلی', 'سابقه محاسبات', 'تاریخچه محاسبات', 'history', 'گزارش محاسبات'],
+        scoreWeight: 0.9
+    },
+    reverse: {
+        triggers: ['reverse', 'معکوس', 'برعکس', 'وارونه', 'حالت معکوس'],
+        scoreWeight: 0.9
+    },
+
+    // ── Calculators (Tools) ──────────────────────────────────────
+    bmi: {
+        triggers: ['bmi', 'بی ام آی', 'b.m.i', 'شاخص توده', 'body mass index', 'توده بدنی', 'وزن و قد'],
+        scoreWeight: 0.9
+    },
+    bsa: {
+        triggers: ['bsa', 'بی اس ای', 'b.s.a', 'سطح بدن', 'body surface area', 'mosteller', 'dubois', 'haycock', 'مساحت بدن'],
+        scoreWeight: 0.9
+    },
+    ibw: {
+        triggers: ['وزن ایده‌آل', 'ideal weight', 'ibw', 'وزن ایده‌ال', 'وزن مناسب', 'وزن استاندارد'],
+        scoreWeight: 0.9
+    },
+    crcl: {
+        triggers: ['crcl', 'creatinine clearance', 'کلیرانس کراتینین', 'کراتینین', 'کلیرانس', 'clearance', 'نارسایی کلیه'],
+        scoreWeight: 0.9
+    },
+    drip: {
+        triggers: ['drip', 'قطره', 'سرعت قطره', 'gravity', 'ساعت', 'حجم', 'زمان', 'ست', 'میکروست', 'ماکروست', 'قطره در دقیقه'],
+        scoreWeight: 0.9
+    },
+    gcs: {
+        triggers: ['gcs', 'گلاسکو', 'glasgow', 'coma', 'کما', 'eye', 'verbal', 'motor', 'چشمی', 'کلامی', 'حرکتی', 'امتیاز هوشیاری'],
+        scoreWeight: 0.8
+    },
+    rass: {
+        triggers: ['rass', 'ریچموند', 'richmond', 'agitation', 'sedation', 'آرام‌بخشی', 'آژیتیشن', 'آرام', 'بی‌قرار', 'مقیاس آرام‌بخشی'],
+        scoreWeight: 0.8
+    },
+    braden: {
+        triggers: ['braden', 'برادن', 'pressure ulcer', 'زخم فشاری', 'sensory', 'moisture', 'activity', 'mobility', 'nutrition', 'friction', 'حس', 'رطوبت', 'فعالیت', 'تحرک', 'تغذیه', 'اصطکاک', 'زخم بستر'],
+        scoreWeight: 0.8
+    },
+    morse: {
+        triggers: ['morse', 'مورس', 'fall', 'سقوط', 'history', 'diagnosis', 'aid', 'gait', 'mental', 'افتادن', 'تشخیص', 'وسیله', 'راه رفتن', 'ذهنی', 'خطر سقوط'],
+        scoreWeight: 0.8
+    },
+    burns: {
+        triggers: ['burns', 'سوختگی', 'tbsa', 'fire', 'آتش', 'پارکلند', 'parkland', 'قانون نُه', 'rule of nines', 'سطح سوختگی', 'سوختگی پوست'],
+        scoreWeight: 0.8
+    },
+    oxygen: {
+        triggers: ['oxygen', 'اکسیژن', 'کپسول', 'cylinder', 'flow', 'فشار', 'pressure', 'duration', 'مدت', 'جریان', 'اکسیژن درمانی', 'کپسول اکسیژن'],
+        scoreWeight: 0.8
+    },
+    vbg: {
+        triggers: ['vbg', 'abg', 'گاز خون', 'blood gas', 'ph', 'pco2', 'hco3', 'base excess', 'be', 'bicarbonate', 'بی‌کربنات', 'گازهای خون', 'تفسیر گاز خون', 'اسید باز'],
+        scoreWeight: 0.8
+    },
+    ventilator: {
+        triggers: ['ventilator', 'ونتیلاتور', 'tidal volume', 'حجم جاری', 'pbw', 'ARDS', 'lung protective', 'تهویه', 'حجم تنفسی', 'دستگاه تنفس'],
+        scoreWeight: 0.8
+    },
+    nutrition: {
+        triggers: ['nutrition', 'تغذیه', 'کالری', 'calories', 'protein', 'پروتئین', 'bmr', 'harris', 'mifflin', 'استرس', 'stress', 'نیاز کالری', 'تغذیه انترال'],
+        scoreWeight: 0.8
+    },
+
+    // ── Converters ─────────────────────────────────────────────────
+    convert: {
+        triggers: ['convert', 'تبدیل', 'mEq', 'meq', 'mg', 'to', 'به', 'میلی‌اکی‌والان', 'الکترولیت', 'تبدیل واحد'],
+        scoreWeight: 0.9
+    },
+    electrolyte: {
+        triggers: ['الکترولیت', 'تبدیل الکترولیت', 'meq به mg', 'mg به meq', 'سدیم', 'پتاسیم', 'کلسیم', 'منیزیم', 'بی‌کربنات', 'electrolyte'],
+        scoreWeight: 0.9
+    },
+    percentage: {
+        triggers: ['درصد', 'غلظت درصد', 'percentage solution', 'محلول درصدی', 'درصد دارو'],
+        scoreWeight: 0.9
+    },
+    unit_convert: {
+        triggers: ['تبدیل واحد', 'واحد', 'میکروگرم', 'میلی‌گرم', 'گرم', 'unit conversion', 'مبدل واحد'],
+        scoreWeight: 0.9
+    },
+    temp_convert: {
+        triggers: ['تبدیل دما', 'درجه', 'سلسیوس', 'فارنهایت', 'temperature', 'دمای بدن', 'تب'],
+        scoreWeight: 0.9
+    },
+    weight_convert: {
+        triggers: ['تبدیل وزن', 'کیلوگرم', 'پوند', 'گرم', 'weight conversion', 'وزن به پوند', 'وزن به کیلو'],
+        scoreWeight: 0.9
+    },
+
+    // ── Drug / Compatibility ──────────────────────────────────────
+    drug: {
+        triggers: ['دارو', 'دوز', 'انفوزیون', 'تزریق', 'پمپ', 'سرنگ', 'میکروگرم', 'میلی‌گرم', 'واحد', 'kg/h', 'mcg', 'mg', 'units', 'میلی‌لیتر', 'سی‌سی', 'حجم', 'محلول', 'آمپول', 'ویال', 'دوز دارو'],
+        scoreWeight: 1.0
+    },
+    druginfo: {
+        triggers: ['اطلاعات', 'درباره', 'توضیح', 'شرح', 'کاربرد', 'مقدار مصرف', 'نحوه مصرف', 'چیه', 'چیست', 'info', 'about', 'describe', 'معرفی', 'راهنما دارو'],
+        scoreWeight: 0.9
+    },
+    dose_calc: {
+        triggers: ['محاسبه دوز', 'دوز دارو', 'حجم ویال', 'dose calculation', 'vial', 'حجم تزریقی', 'مقدار مصرف دارو'],
+        scoreWeight: 0.9
+    },
+    compat_tool: {
+        triggers: ['سازگاری دارو', 'compatibility', 'تداخل دارویی', 'داروها', 'drug compatibility', 'سازگاری Y-Site', 'Y-site', 'مخلوط داروها'],
+        scoreWeight: 0.9
+    },
+    ysite: {
+        triggers: ['ysite', 'y-site', 'سازگاری', 'تداخل', 'دارو', 'mix', 'مخلوط', 'همزمان', 'تزریق همزمان', 'Y-Site Compatibility'],
+        scoreWeight: 0.8
+    },
+
+    // ── Theme / Settings ───────────────────────────────────────────
+    settings: {
+        triggers: ['dark mode', 'light mode', 'تاریک', 'روشن', 'دارک', 'لایت', 'large font', 'small font', 'فونت بزرگ', 'فونت کوچک', 'تم تاریک', 'تم روشن', 'تنظیمات', 'settings', 'حالت شب', 'حالت روز'],
+        scoreWeight: 0.7
+    },
+    theme: {
+        triggers: ['فاکس', 'fox', 'اقیانوس', 'ocean', 'رز', 'rose', 'جنگل', 'forest', 'پیش‌فرض', 'default', 'تم فاکس', 'تم اقیانوس', 'تم رز', 'تم جنگل', 'theme fox', 'theme ocean', 'theme rose', 'theme forest'],
+        scoreWeight: 0.9
+    },
+
+    // ── Help ──────────────────────────────────────────────────────
+    help: {
+        triggers: ['help', 'راهنما', 'کمک', 'راهنمایی', 'نمونه', 'example', 'چه کارایی', 'چطور کار کنم', 'راهنمای صوتی', 'چه کار کنم'],
+        scoreWeight: 0.6
+    }
+};
+
+function scoreCommand(text, params) {
+    const lower = text.toLowerCase();
+    const scores = {};
+    for (const [cmd, info] of Object.entries(COMMAND_KEYWORDS)) {
+        let score = 0;
+        for (const trig of info.triggers) {
+            if (lower.includes(trig)) score += 1;
+        }
+        // bonuses
+        if (cmd === 'drug' && params.drugId) score += 2;
+        if (cmd === 'druginfo' && params.drugId) score += 2;
+        if (cmd === 'bmi' && params.weight && params.height) score += 2;
+        if (cmd === 'bsa' && params.weight && params.height) score += 2;
+        if (cmd === 'crcl' && params.age && params.weight && params.dose) score += 2;
+        if (cmd === 'drip' && params.volume && params.time) score += 2;
+        if (cmd === 'convert' && params.meq && params.electrolyte) score += 2;
+        if (cmd === 'gcs' && (params.gcs_eye || params.gcs_verbal || params.gcs_motor)) score += 2;
+        if (cmd === 'rass' && params.rassScore !== undefined) score += 2;
+        if (cmd === 'braden' && params.bradenScores) score += 2;
+        if (cmd === 'morse' && params.morseScores) score += 2;
+        if (cmd === 'burns' && text.includes('سوختگی')) score += 2;
+        if (cmd === 'oxygen' && (params.flow || params.pressure || params.liters)) score += 2;
+        if (cmd === 'ventilator' && (params.height || params.weight)) score += 2;
+        if (cmd === 'nutrition' && (params.weight || params.height || params.age)) score += 2;
+        if (cmd === 'ysite' && (params.drug1 || params.drug2)) score += 2;
+        if (cmd === 'settings' && (text.includes('dark') || text.includes('light') || text.includes('font') || text.includes('تاریک') || text.includes('روشن') || text.includes('دارک') || text.includes('لایت'))) score += 2;
+        scores[cmd] = score * info.scoreWeight;
+    }
+    return scores;
+}
+
+function processVoiceCommand(text) {
+    let normalized = PersianNumbers.toLatin(text);
+    normalized = normalized.replace(/[،،]/g, ' ').replace(/\s+/g, ' ').trim();
+    const lower = normalized.toLowerCase();
+// --- FAST PATH: Direct commands for speed ---
+    // Check for common commands first (no need for full parsing)
+    const fastCommands = {
+        'تاریک': () => { AppState.settings.themeMode = 'dark'; saveSettings(); applyThemeMode(); showVoiceResult('حالت تاریک فعال شد', 'success'); },
+        'روشن': () => { AppState.settings.themeMode = 'light'; saveSettings(); applyThemeMode(); showVoiceResult('حالت روشن فعال شد', 'success'); },
+        'فونت بزرگ': () => { AppState.settings.largeFont = true; saveSettings(); applySettings(); showVoiceResult('فونت بزرگ فعال شد', 'success'); },
+        'فونت معمولی': () => { AppState.settings.largeFont = false; saveSettings(); applySettings(); showVoiceResult('فونت معمولی فعال شد', 'success'); },
+        'راهنما': () => { showVoiceResult('دستورات نمونه: "هپارین ۱۲ واحد/کیلوگرم/ساعت وزن ۷۰", "BMI وزن ۷۵ قد ۱۷۵", "قطره ۵۰۰ میلی‌لیتر در ۸ ساعت", "تاریک", "فونت بزرگ"', 'info'); },
+        'ماشین حساب': () => { switchTab('calculator'); showVoiceResult('بخش ماشین حساب باز شد', 'success'); },
+        'داروها': () => { switchTab('drugs'); showVoiceResult('مرجع داروها باز شد', 'success'); },
+        'ابزارها': () => { switchTab('tools'); showVoiceResult('ابزارهای بالینی باز شد', 'success'); },
+    };
+    
+    for (const [key, fn] of Object.entries(fastCommands)) {
+        if (lower === key || lower === 'برو به ' + key || lower === 'رفتن به ' + key) {
+            fn();
+            return;
+        }
+    }
+// === Dark / Light mode ===
+if (lower.includes('dark mode') || lower.includes('دارک') || lower.includes('تاریک') || lower.includes('حالت شب')) {
+    AppState.settings.themeMode = 'dark';
+    saveSettings();
+    applyThemeMode();
+    showVoiceResult('حالت تاریک فعال شد', 'success');
+    return;
+}
+if (lower.includes('light mode') || lower.includes('لایت') || lower.includes('روشن') || lower.includes('حالت روز')) {
+    AppState.settings.themeMode = 'light';
+    saveSettings();
+    applyThemeMode();
+    showVoiceResult('حالت روشن فعال شد', 'success');
+    return;
+}
+
+// === Font size ===
+if (lower.includes('large font') || lower.includes('فونت بزرگ')) {
+    AppState.settings.largeFont = true;
+    saveSettings();
+    applySettings();
+    showVoiceResult('فونت بزرگ فعال شد', 'success');
+    return;
+}
+if (lower.includes('small font') || lower.includes('فونت کوچک') || lower.includes('فونت معمولی')) {
+    AppState.settings.largeFont = false;
+    saveSettings();
+    applySettings();
+    showVoiceResult('فونت معمولی فعال شد', 'success');
+    return;
+}
+    // ---- Extract params ----
+    const params = extractParams(normalized);
+
+    // ---- Drug info detection (early) ----
+    const infoTriggers = ['اطلاعات', 'درباره', 'توضیح', 'شرح', 'کاربرد', 'مقدار مصرف', 'نحوه مصرف', 'چیه', 'چیست', 'info', 'about', 'describe'];
+    const hasInfoTrigger = infoTriggers.some(t => lower.includes(t));
+    if (hasInfoTrigger) {
+        const drugId = params.drugId || findDrugName(normalized);
+        if (drugId) {
+            executeCommand('druginfo', normalized, { drugId });
+            return;
+        }
+    }
+
+    // ---- Disambiguate BMI vs BSA ----
+    if (lower.includes('سطح بدن') || lower.includes('body surface')) {
+        if (params.weight && params.height) {
+            executeCommand('bsa', normalized, params);
+            return;
+        }
+    }
+
+    // ---- Check for corrections ----
+    if (lower.includes('no') || lower.includes('نه') || lower.includes('اشتباه')) {
+        if (lastCommand) {
+            showVoiceResult('دستور قبلی لغو شد. لطفاً دوباره بگویید.', 'info');
+            lastCommand = null;
+            lastParams = null;
+            return;
+        }
+    }
+
+    // ---- Score commands ----
+    // ---- Score commands ----
+const scores = scoreCommand(normalized, params);
+const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+const best = sorted[0];
+
+// FALLBACK: if no command scored, but we have weight & height -> assume BMI
+if (!best || best[1] === 0) {
+    if (params.weight && params.height) {
+        executeCommand('bmi', normalized, params);
+        return;
+    }
+    showVoiceResult('متوجه نشدم. لطفاً واضح‌تر بگویید یا از دکمه‌های نمونه استفاده کنید.', 'error');
+    return;
+}
+
+const cmd = best[0];
+// No confirmation – execute immediately
+executeCommand(cmd, normalized, params);
+
+// ---- Execute command ----
+function executeCommand(cmd, text, params) {
+    lastCommand = cmd;
+    lastParams = params;
+
+    switch (cmd) {
+            case 'history':
+    loadHistory();
+    if (DOM.historyModal) {
+        DOM.historyModal.classList.add('active');
+        document.body.classList.add('no-scroll');
+    }
+    showVoiceResult('تاریخچه محاسبات باز شد', 'success');
+    break;
+        case 'help':
+            showVoiceResult('دستورات نمونه: "هپارین ۱۲ واحد/کیلوگرم/ساعت وزن ۷۰", "BMI وزن ۷۵ قد ۱۷۵", "قطره ۵۰۰ میلی‌لیتر در ۸ ساعت", "تبدیل ۲۰ mEq سدیم به mg", "GCS 4 5 6", "سوختگی", "اکسیژن ۵ لیتر فشار ۱۵۰ بار جریان ۴", "تغذیه وزن ۷۰ قد ۱۷۵ سن ۵۰", "سازگاری هپارین و وانکومایسین", "تاریک", "فونت بزرگ"', 'info');
+            break;
+        case 'reverse':
+            AppState.reverseMode = !AppState.reverseMode;
+            updateReverseUI();
+            showVoiceResult(AppState.reverseMode ? 'حالت معکوس فعال شد' : 'حالت معکوس غیرفعال شد', 'info');
+            break;
+        case 'drug':
+            handleDrugVoice(text, params);
+            break;
+        case 'bmi':
+            handleBMIVoice(params);
+            break;
+        case 'bsa':
+            handleBSAVoice(params);
+            break;
+        case 'crcl':
+            handleCrClVoice(params);
+            break;
+        case 'drip':
+            handleDripRateVoice(params);
+            break;
+        case 'convert':
+            handleConvertVoice(text, params);
+            break;
+        case 'gcs':
+            handleGCSVoice(text, params);
+            break;
+        case 'rass':
+            handleRASSVoice(text, params);
+            break;
+        case 'braden':
+            handleBradenVoice(params);
+            break;
+        case 'morse':
+            handleMorseVoice(params);
+            break;
+        case 'burns':
+            handleBurnsVoice(text);
+            break;
+        case 'oxygen':
+            handleOxygenVoice(params);
+            break;
+        case 'vbg':
+            handleVBGVoice(text, params);
+            break;
+        case 'ventilator':
+            handleVentilatorVoice(text, params);
+            break;
+        case 'nutrition':
+            handleNutritionVoice(text, params);
+            break;
+        case 'ysite':
+            handleYSiteVoice(text, params);
+            break;
+            case 'druginfo':
+    handleDrugInfo(text, params);
+    break;
+            case 'tab_calculator':
+    switchTab('calculator');
+    showVoiceResult('بخش ماشین حساب باز شد', 'success');
+    break;
+
+case 'tab_drugs':
+    switchTab('drugs');
+    showVoiceResult('مرجع داروها باز شد', 'success');
+    break;
+
+case 'tab_tools':
+    switchTab('tools');
+    showVoiceResult('ابزارهای بالینی باز شد', 'success');
+    break;
+
+case 'clear':
+    clearResults();
+    showVoiceResult('نتایج پاک شد', 'success');
+    break;
+
+case 'manual_calc':
+    openManualCalculation();
+    showVoiceResult('محاسبه دستی باز شد', 'success');
+    break;
+            
+case 'ibw':
+    // Switch to tools tab and scroll to IBW
+    switchTab('tools');
+    setTimeout(() => {
+        calculateIBW();
+        openAccordionForTool('ibwResult', 'ibwAccordionItem');
+    }, 300);
+    showVoiceResult('وزن ایده‌آل محاسبه شد', 'success');
+    break;
+
+case 'electrolyte':
+    switchTab('tools');
+    setTimeout(() => {
+        convertElectrolyteLive('meq');
+        openAccordionForTool('electrolyteResult', 'electrolyteAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل الکترولیت انجام شد', 'success');
+    break;
+
+case 'percentage':
+    switchTab('tools');
+    setTimeout(() => {
+        convertPercentageLive();
+        openAccordionForTool('percentageResult', 'percentageAccordionItem');
+    }, 300);
+    showVoiceResult('غلظت درصد محاسبه شد', 'success');
+    break;
+
+case 'unit_convert':
+    switchTab('tools');
+    setTimeout(() => {
+        convertUnitsLive('from');
+        openAccordionForTool('unitResult', 'unitAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل واحد انجام شد', 'success');
+    break;
+
+case 'temp_convert':
+    switchTab('tools');
+    setTimeout(() => {
+        convertTempLive('c');
+        openAccordionForTool('tempResult', 'tempAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل دما انجام شد', 'success');
+    break;
+
+case 'weight_convert':
+    switchTab('tools');
+    setTimeout(() => {
+        convertWeightLive('kg');
+        openAccordionForTool('weightResult', 'weightAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل وزن انجام شد', 'success');
+    break;
+
+case 'dose_calc':
+    switchTab('tools');
+    setTimeout(() => {
+        // Populate from drug picker if possible, then calculate
+        populateDoseCalcFromDrug();
+        calculateDose();
+        openAccordionForTool('doseResult', 'doseCalcAccordionItem');
+    }, 300);
+    showVoiceResult('محاسبه دوز انجام شد', 'success');
+    break;
+
+case 'compat_tool':
+    switchTab('tools');
+    setTimeout(() => {
+        checkCompatibility();
+        openAccordionForTool('compatResult', 'compatAccordionItem');
+    }, 300);
+    showVoiceResult('بررسی سازگاری انجام شد', 'success');
+    break;
+
+case 'theme':
+    // This should already be caught by the early theme check, but as a fallback:
+    const themeMap = {
+        'fox': 'fox', 'فاکس': 'fox',
+        'ocean': 'ocean', 'اقیانوس': 'ocean',
+        'rose': 'rose', 'رز': 'rose',
+        'forest': 'forest', 'جنگل': 'forest',
+        'default': 'default', 'پیش‌فرض': 'default'
+    };
+    const lowerText = text.toLowerCase();
+    let foundTheme = null;
+    for (const [key, val] of Object.entries(themeMap)) {
+        if (lowerText.includes(key)) {
+            foundTheme = val;
+            break;
+        }
+    }
+    if (foundTheme) {
+        AppState.settings.colorTheme = foundTheme;
+        saveSettings();
+        applyTheme(foundTheme);
+        showVoiceResult(`تم ${foundTheme} فعال شد`, 'success');
+    } else {
+        showVoiceResult('تم شناسایی نشد', 'error');
+    }
+    break;
+        default:
+            showVoiceResult('این دستور هنوز پشتیبانی نمی‌شود.', 'error');
+    }
+    // Show tip if available
+    const tip = TIPS[cmd];
+    if (tip) {
+        setTimeout(() => {
+            if (voiceResultEl) {
+                voiceResultEl.innerHTML += `<div class="voice-tip" style="margin-top:8px;font-size:12px;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:6px;">${tip}</div>`;
+            }
+        }, 1500);
+    }
+}
+}
+// ============================================
+// HANDLER FUNCTIONS (implement all tools)
+// ============================================
+
+// ---- Drug handler ----
+function handleDrugVoice(text, params) {
+    const drugId = params.drugId || findDrugName(text);
+    if (!drugId) {
+        showVoiceResult('دارو شناسایی نشد. لطفاً نام دارو را واضح بگویید.', 'error');
+        return;
+    }
+
+    selectDrug(drugId);
+    const drug = drugDatabase[drugId];
+
+    // Method
+    if (params.method) {
+        const methodBtns = document.querySelectorAll('.method-btn-compact');
+        methodBtns.forEach(btn => {
+            if (btn.dataset.method === params.method) btn.click();
+        });
+    }
+
+    // Volume
+    if (params.volume !== undefined) {
+        const methodKey = AppState.infusionMethod;
+        const volumes = drug.defaultSolutionVolumes[methodKey];
+        if (volumes.includes(params.volume)) {
+            const btns = document.querySelectorAll('.volume-preset-btn');
+            for (const btn of btns) {
+                if (parseInt(btn.dataset.volume) === params.volume) {
+                    btn.click();
+                    break;
+                }
+            }
+        } else {
+            if (DOM.customVolumeContainer) {
+                DOM.customVolumeContainer.style.display = 'flex';
+                DOM.customVolume.value = params.volume;
+                DOM.customVolume.dataset.numericValue = params.volume;
+                AppState.customVolume = true;
+                document.querySelectorAll('.volume-preset-btn').forEach(b => b.classList.remove('active'));
+            }
+        }
+    }
+// --- Detect infusion method from volume or keywords ---
+if (params.volume !== undefined) {
+    if (params.volume <= 50) {
+        // Small volume -> syringe
+        params.method = 'syringe';
+    } else if (params.volume >= 100) {
+        // Large volume -> infusion
+        params.method = 'infusion';
+    }
+}
+// Also if user explicitly said method, it overrides
+// (already handled by the existing code)
+    // Ampoules
+    if (params.ampoules) {
+        AppState.ampouleCount = Math.max(1, params.ampoules);
+        updateAmpouleInfo();
+        const ampDisplay = document.getElementById('ampouleCount');
+        if (ampDisplay) ampDisplay.textContent = AppState.ampouleCount;
+    }
+
+    // Custom amount
+    if (params.customAmount !== undefined && params.customUnit) {
+        const isInsulin = drug.id === 'insulin';
+        if (!isInsulin) {
+            const toggleRow = DOM.customAmountToggleClickRow;
+            if (toggleRow) toggleRow.click();
+        }
+        if (DOM.customAmountInput) {
+            DOM.customAmountInput.value = params.customAmount;
+            DOM.customAmountInput.dataset.numericValue = params.customAmount;
+        }
+    }
+
+    // Weight
+    const useWeight = (params.weight !== undefined) || (text.includes('/kg'));
+    if (useWeight && DOM.weightCheckbox && DOM.patientWeight) {
+        DOM.weightCheckbox.checked = true;
+        AppState.useWeight = true;
+        DOM.patientWeight.disabled = false;
+        if (DOM.weightIosToggle) DOM.weightIosToggle.classList.add('on');
+        if (DOM.weightInputRow) DOM.weightInputRow.style.display = 'flex';
+        const w = params.weight || drug.weightBased?.defaultWeight || 70;
+        DOM.patientWeight.value = w;
+        DOM.patientWeight.dataset.numericValue = w;
+        updateWeightBasedUnit(drug);
+    } else {
+        if (DOM.weightCheckbox) DOM.weightCheckbox.checked = false;
+        AppState.useWeight = false;
+        if (DOM.weightIosToggle) DOM.weightIosToggle.classList.remove('on');
+        if (DOM.weightInputRow) DOM.weightInputRow.style.display = 'none';
+        if (DOM.patientWeight) DOM.patientWeight.disabled = true;
+    }
+
+    // Dose
+    const doseVal = params.dose || extractNumberSimple(text);
+    if (DOM.doctorOrder && doseVal !== null) {
+        DOM.doctorOrder.value = doseVal;
+        DOM.doctorOrder.dataset.numericValue = doseVal;
+    }
+
+    if (doseVal === null) {
+        showVoiceResult('دوز مشخص نشد. لطفاً مقدار دوز را بگویید.', 'error');
+        return;
+    }
+}
+// ---- Drug Info ----
+function handleDrugInfo(text, params) {
+    const drugId = params.drugId || findDrugName(text);
+    if (!drugId) {
+        showVoiceResult('نام دارو مشخص نشد. لطفاً نام دارو را بگویید.', 'error');
+        return;
+    }
+    const drug = drugDatabase[drugId];
+    if (!drug) {
+        showVoiceResult('این دارو در پایگاه داده موجود نیست.', 'error');
+        return;
+    }
+
+    // Switch to drugs tab
+    switchTab('drugs');
+
+    // Wait for the tab to render, then find and open the accordion
+    setTimeout(() => {
+        // Find the accordion item by drug ID
+        const drugItem = document.querySelector(`.qref-accordion-item[data-drug-id="${drugId}"]`);
+        if (drugItem) {
+            const header = drugItem.querySelector('.qref-row');
+            if (header && header.dataset.bodyId) {
+                // Open the accordion using its body ID
+                toggleAccordionById(header.dataset.bodyId);
+                // Scroll to it after a short delay
+                setTimeout(() => {
+                    drugItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 400);
+            } else if (header) {
+                // Fallback: try to open by clicking the header
+                header.click();
+            }
+        } else {
+            // Fallback: search by drug name
+            const items = document.querySelectorAll('.qref-accordion-item');
+            for (const item of items) {
+                const nameEl = item.querySelector('.qref-name');
+                if (nameEl && nameEl.textContent.includes(drug.persianName)) {
+                    const header = item.querySelector('.qref-row');
+                    if (header && header.dataset.bodyId) {
+                        toggleAccordionById(header.dataset.bodyId);
+                        setTimeout(() => {
+                            item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 400);
+                    }
+                    break;
+                }
+            }
+        }
+        
+        showVoiceResult(`✅ اطلاعات ${drug.persianName} در بخش مرجع داروها باز شد.`, 'success');
+    }, 300);
+}
+
+// ---- BMI (with accordion auto-open) ----
+function handleBMIVoice(params) {
+    const w = params.weight || 0;
+    const h = params.height || 0;
+    if (!w || !h) {
+        showVoiceResult('لطفاً وزن و قد را وارد کنید (مثال: BMI وزن ۷۵ قد ۱۷۵)', 'error');
+        return;
+    }
+    document.getElementById('bmiWeight').value = w;
+    document.getElementById('bmiHeight').value = h;
+    calculateBMI();
+    const result = document.getElementById('bmiResult');
+    const msg = result ? 'BMI محاسبه شد: ' + (result.textContent || result.innerText) : 'BMI محاسبه شد';
+    showVoiceResult(msg, 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('bmiAccordionItem'), 300);
+}
+
+// ---- BSA ----
+function handleBSAVoice(params) {
+    const w = params.weight || 0;
+    const h = params.height || 0;
+    if (!w || !h) {
+        showVoiceResult('لطفاً وزن و قد را وارد کنید (مثال: BSA وزن ۷۰ قد ۱۷۰)', 'error');
+        return;
+    }
+    document.getElementById('bsaWeight').value = w;
+    document.getElementById('bsaHeight').value = h;
+    const text = params._original || '';
+    const formulaSelect = document.getElementById('bsaFormula');
+    if (formulaSelect) {
+        if (text.includes('mosteller')) formulaSelect.value = 'mosteller';
+        else if (text.includes('dubois')) formulaSelect.value = 'dubois';
+        else if (text.includes('haycock')) formulaSelect.value = 'haycock';
+    }
+    calculateBSA();
+    showVoiceResult('BSA محاسبه شد', 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('bsaAccordionItem'), 300);
+}
+
+// ---- CrCl ----
+function handleCrClVoice(params) {
+    const age = params.age || 0;
+    const w = params.weight || 0;
+    const cr = params.dose || 0;
+    const gender = params.gender || 'male';
+    if (!age || !w || !cr) {
+        showVoiceResult('لطفاً سن، وزن و کراتینین را وارد کنید', 'error');
+        return;
+    }
+    document.getElementById('crclAge').value = age;
+    document.getElementById('crclWeight').value = w;
+    document.getElementById('crclValue').value = cr;
+    document.getElementById('crclGender').value = gender;
+    calculateCrCl();
+    showVoiceResult('کلیرانس کراتینین محاسبه شد', 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('crclAccordionItem'), 300);
+}
+
+// ---- Drip Rate ----
+function handleDripRateVoice(params) {
+    const vol = params.volume || 0;
+    const time = params.time || 0;
+    if (!vol || !time) {
+        showVoiceResult('لطفاً حجم و زمان را وارد کنید (مثال: قطره ۵۰۰ میلی‌لیتر در ۸ ساعت)', 'error');
+        return;
+    }
+    document.getElementById('dripVolume').value = vol;
+    document.getElementById('dripTime').value = time;
+    calculateDripRateLive();
+    showVoiceResult('نرخ قطره محاسبه شد', 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('dripAccordionItem'), 300);
+}
+
+// ---- Convert ----
+function handleConvertVoice(text, params) {
+    const match = text.match(/convert\s+(\d+(?:\.\d+)?)\s+(\w+)\s+(\w+)\s+to\s+(\w+)/i);
+    if (!match) {
+        showVoiceResult('فرمت تبدیل: "convert 20 mEq sodium to mg"', 'error');
+        return;
+    }
+    const value = parseFloat(match[1]);
+    const fromUnit = match[2].toLowerCase();
+    const elementName = match[3].toLowerCase();
+    const toUnit = match[4].toLowerCase();
+    const elemMap = {
+        'sodium': 'sodium',
+        'potassium': 'potassium',
+        'calcium': 'calcium',
+        'magnesium': 'magnesium',
+        'bicarbonate': 'sodium_bicarbonate',
+        'sodium bicarbonate': 'sodium_bicarbonate'
+    };
+    const elemKey = elemMap[elementName];
+    if (!elemKey) {
+        showVoiceResult('عنصر نامشخص. از سدیم، پتاسیم، کلسیم، منیزیم یا بی‌کربنات استفاده کنید.', 'error');
+        return;
+    }
+    document.getElementById('electrolyteElement').value = elemKey;
+    const meqEl = document.getElementById('electrolyteMeq');
+    const mgEl = document.getElementById('electrolyteMg');
+    if (fromUnit === 'meq' && toUnit === 'mg') {
+        meqEl.value = value;
+        convertElectrolyteLive('meq');
+    } else if (fromUnit === 'mg' && toUnit === 'meq') {
+        mgEl.value = value;
+        convertElectrolyteLive('mg');
+    } else {
+        showVoiceResult('واحدها باید mEq و mg باشند.', 'error');
+        return;
+    }
+    showVoiceResult('تبدیل انجام شد', 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('electrolyteAccordionItem'), 300);
+}
+
+// ---- GCS ----
+function handleGCSVoice(text, params) {
+    let e = params.gcs_eye || 0;
+    let v = params.gcs_verbal || 0;
+    let m = params.gcs_motor || 0;
+    if (!e || !v || !m) {
+        const nums = text.match(/(\d+)\s*(\d+)\s*(\d+)/);
+        if (nums) {
+            e = parseInt(nums[1]); v = parseInt(nums[2]); m = parseInt(nums[3]);
+        }
+    }
+    if (!e || !v || !m) {
+        showVoiceResult('لطفاً سه عدد برای GCS وارد کنید (مثال: GCS 4 5 6)', 'error');
+        switchTab('tools');
+        return;
+    }
+    document.querySelectorAll('.gcs-btn[data-domain="eye"]').forEach(btn => {
+        if (parseInt(btn.dataset.score) === e) btn.click();
+    });
+    document.querySelectorAll('.gcs-btn[data-domain="verbal"]').forEach(btn => {
+        if (parseInt(btn.dataset.score) === v) btn.click();
+    });
+    document.querySelectorAll('.gcs-btn[data-domain="motor"]').forEach(btn => {
+        if (parseInt(btn.dataset.score) === m) btn.click();
+    });
+    showVoiceResult(`GCS محاسبه شد: E${e} V${v} M${m}`, 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('gcsAccordionItem'), 300);
+}
+
+// ---- RASS ----
+function handleRASSVoice(text, params) {
+    let score = params.rassScore;
+    if (score === undefined) {
+        const match = text.match(/([+-]?\d+)/);
+        if (match) score = parseInt(match[1]);
+    }
+    if (score === undefined || score < -5 || score > 4) {
+        showVoiceResult('لطفاً عدد RASS را بین -5 تا 4 وارد کنید (مثال: RASS 2)', 'error');
+        switchTab('tools');
+        return;
+    }
+    document.querySelectorAll('.rass-level').forEach(level => {
+        if (parseInt(level.dataset.score) === score) level.click();
+    });
+    showVoiceResult(`RASS ${score} تنظیم شد`, 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('rassAccordionItem'), 300);
+}
+
+// ---- Braden ----
+function handleBradenVoice(params) {
+    const scores = params.bradenScores;
+    if (!scores || scores.length !== 6) {
+        showVoiceResult('لطفاً ۶ عدد برای برادن وارد کنید (حس، رطوبت، فعالیت، تحرک، تغذیه، اصطکاک)', 'error');
+        switchTab('tools');
+        return;
+    }
+    const domains = ['sensory', 'moisture', 'activity', 'mobility', 'nutrition', 'friction'];
+    domains.forEach((d, i) => {
+        document.querySelectorAll(`.gcs-btn[data-braden="${d}"]`).forEach(btn => {
+            if (parseInt(btn.dataset.score) === scores[i]) btn.click();
+        });
+    });
+    showVoiceResult('مقیاس برادن تنظیم شد', 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('bradenAccordionItem'), 300);
+}
+
+// ---- Morse ----
+function handleMorseVoice(params) {
+    const scores = params.morseScores;
+    if (!scores || scores.length !== 6) {
+        showVoiceResult('لطفاً ۶ عدد برای مورس وارد کنید (سابقه سقوط، تشخیص ثانویه، وسیله کمکی، IV، راه رفتن، وضعیت ذهنی)', 'error');
+        switchTab('tools');
+        return;
+    }
+    const domains = ['fallHistory', 'secDiag', 'aid', 'iv', 'gait', 'mental'];
+    domains.forEach((d, i) => {
+        document.querySelectorAll(`.gcs-btn[data-morse="${d}"]`).forEach(btn => {
+            if (parseInt(btn.dataset.score) === scores[i]) btn.click();
+        });
+    });
+    showVoiceResult('مقیاس مورس تنظیم شد', 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('morseAccordionItem'), 300);
+}
+
+// ---- Burns ----
+function handleBurnsVoice(text) {
+    switchTab('tools');
+    showVoiceResult('لطفاً روی نواحی سوختگی در بخش سوختگی کلیک کنید.', 'info');
+    if (text.includes('کودک') || text.includes('pediatric')) setBurnsAge('pediatric');
+    else setBurnsAge('adult');
+    setTimeout(() => openAccordionById('burnsAccordionItem'), 300);
+}
+
+// ---- Oxygen ----
+function handleOxygenVoice(params) {
+    const size = params.liters || 0;
+    const pressure = params.pressure || 0;
+    const flow = params.flow || 0;
+    if (!size || !pressure || !flow) {
+        showVoiceResult('لطفاً حجم کپسول، فشار و جریان را وارد کنید (مثال: اکسیژن ۵ لیتر فشار ۱۵۰ بار جریان ۴ لیتر در دقیقه)', 'error');
+        switchTab('tools');
+        return;
+    }
+    document.getElementById('oxyCylinderSize').value = size;
+    document.getElementById('oxyPressure').value = pressure;
+    document.getElementById('oxyFlow').value = flow;
+    calculateOxygen();
+    showVoiceResult('مدت کپسول اکسیژن محاسبه شد', 'success');
+    switchTab('tools');
+    setTimeout(() => {
+    if (!openAccordionForTool('oxyResult', 'oxygenAccordionItem')) {
+        // If still not found, try the known ID (maybe it's 'oxygenAccordion')
+        openAccordionById('oxygenAccordion');
+    }
+}, 300);
+}
+
+// ---- VBG ----
+function handleVBGVoice(text, params) {
+    const pH = params.pH || 0;
+    const pco2 = params.pco2 || 0;
+    const hco3 = params.hco3 || 0;
+    if (!pH || !pco2 || !hco3) {
+        showVoiceResult('لطفاً pH، pCO₂ و HCO₃ را وارد کنید (مثال: VBG pH 7.4 pco2 45 hco3 24)', 'error');
+        switchTab('tools');
+        return;
+    }
+    document.getElementById('vbgPH').value = pH;
+    document.getElementById('vbgPCO2').value = pco2;
+    document.getElementById('vbgHCO3').value = hco3;
+    if (params.be) document.getElementById('vbgBE').value = params.be;
+    interpretVBG();
+    showVoiceResult('تفسیر گازهای خون انجام شد', 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('vbgAccordionItem'), 300);
+}
+
+// ---- Ventilator ----
+function handleVentilatorVoice(text, params) {
+    const height = params.height || 0;
+    const gender = params.gender || 'male';
+    if (!height) {
+        showVoiceResult('لطفاً قد بیمار را وارد کنید (مثال: ونتیلاتور قد ۱۷۵ مرد)', 'error');
+        switchTab('tools');
+        return;
+    }
+    document.getElementById('ventHeight').value = height;
+    document.querySelectorAll('#ventGenderBtns .method-btn-compact').forEach(btn => {
+        if (btn.dataset.gender === gender) btn.click();
+    });
+    document.querySelector('#ventMethodTabs .vent-tab[data-tab="height"]')?.click();
+    calculateVentTV();
+    showVoiceResult('حجم جاری ونتیلاتور محاسبه شد', 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('ventilatorAccordionItem'), 300);
+}
+
+// ---- Nutrition ----
+function handleNutritionVoice(text, params) {
+    const weight = params.weight || 0;
+    const height = params.height || 0;
+    const age = params.age || 0;
+    const gender = params.gender || 'male';
+    if (!weight || !height || !age) {
+        showVoiceResult('لطفاً وزن، قد و سن را وارد کنید (مثال: تغذیه وزن ۷۰ قد ۱۷۵ سن ۵۰ مرد)', 'error');
+        switchTab('tools');
+        return;
+    }
+    document.getElementById('nutWeight').value = weight;
+    document.getElementById('nutHeight').value = height;
+    document.getElementById('nutAge').value = age;
+    document.querySelectorAll('#nutGenderBtns .method-btn-compact').forEach(btn => {
+        if (btn.dataset.gender === gender) btn.click();
+    });
+    if (text.includes('سپسیس') || text.includes('sepsis')) document.getElementById('nutStress').value = '1.35';
+    else if (text.includes('سوختگی')) document.getElementById('nutStress').value = '1.5';
+    else if (text.includes('آردس') || text.includes('ards')) document.getElementById('nutStress').value = '2.0';
+    else document.getElementById('nutStress').value = '1.2';
+    calculateNutrition();
+    showVoiceResult('نیاز تغذیه‌ای محاسبه شد', 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('nutritionAccordionItem'), 300);
+}
+
+// ---- Y-Site ----
+function handleYSiteVoice(text, params) {
+    const d1 = params.drug1 || params.drugId;
+    const d2 = params.drug2 || findDrugName(text.replace(d1, ''));
+    if (!d1 || !d2) {
+        showVoiceResult('لطفاً دو دارو را برای بررسی سازگاری وارد کنید (مثال: سازگاری هپارین و وانکومایسین)', 'error');
+        switchTab('tools');
+        return;
+    }
+    document.querySelectorAll('#ysiteDrugGrid .ysite-drug-chip').forEach(chip => {
+        if (chip.dataset.id === d1 || chip.dataset.id === d2) chip.click();
+    });
+    showVoiceResult(`سازگاری ${drugDatabase[d1]?.persianName} و ${drugDatabase[d2]?.persianName} بررسی شد`, 'success');
+    switchTab('tools');
+    setTimeout(() => openAccordionById('ysiteAccordionItem'), 300);
+}
+// ---- findDrugName, extractNumberSimple, etc. ----
+function findDrugName(text) {
+    const lower = text.toLowerCase();
+    for (const [id, drug] of Object.entries(drugDatabase)) {
+        const names = [drug.persianName.toLowerCase(), drug.englishName.toLowerCase(), ...drug.alternativeNames.map(n => n.toLowerCase())];
+        for (const name of names) {
+            if (lower.includes(name)) return id;
+        }
+    }
+    return null;
+}
+function extractNumberSimple(text) {
+    const match = text.match(/(\d+(?:\.\d+)?)/);
+    return match ? parseFloat(match[1]) : null;
+}
+
+// ---- INIT ----
+function initVoiceTab() {
+    setupVoiceTab();
+}
+
+// ============================================
+// MANUAL CALCULATION
+// ============================================
+function setupManualCalculation() {
+    if (DOM.openManualBtn && DOM.manualSection && DOM.calculatorControls) {
+        DOM.openManualBtn.addEventListener('click', openManualCalculation);
+    }
+}
+
+function openManualCalculation() {
+    const manualSection = DOM.manualSection;
+    const calculatorControls = DOM.calculatorControls;
+    const selectedDrugHeader = document.querySelector('.selected-drug-compact');
+    const drugSidebar = document.querySelector('.drug-sidebar');
+    const calcBtnWrap = DOM.calculateBtnWrap;
+
+    if (manualSection && calculatorControls) {
+        if (calculatorControls) calculatorControls.style.display = 'none';
+        if (calcBtnWrap) calcBtnWrap.style.display = 'none';
+        if (selectedDrugHeader) selectedDrugHeader.style.display = 'none';
+        manualSection.style.display = 'flex';
+        manualSection.style.flexDirection = 'column';
+        manualSection.style.height = '100%';
+        if (!manualSection.querySelector('.manual-controls')) createManualCalculationContent();
+        ['resultsSection', 'guideSection', 'warningsSection', 'compatibilitySection'].forEach(id => {
+            const section = document.getElementById(id);
+            if (section) section.style.display = 'none';
+        });
+        if (drugSidebar && window.innerWidth < 768) drugSidebar.style.display = 'none';
+    }
+}
+
+function createManualCalculationContent() {
+    const manualSection = document.getElementById('manualSection');
+    if (!manualSection) return;
+    manualSection.innerHTML = `
+        <div class="manual-header">
+            <h3><i class="fas fa-calculator"></i> محاسبه دستی دارو</h3>
+            <button class="icon-btn" id="closeManualBtn"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="manual-controls">
+
+            <!-- Step 1: Method -->
+            <div class="control-group">
+                <label><i class="fas fa-infinity"></i> روش تزریق</label>
+                <div class="method-selector-compact">
+                    <button class="method-btn-compact gradient active" data-method="syringe"><i class="fas fa-syringe"></i> <span>پمپ سرنگ</span></button>
+                    <button class="method-btn-compact gradient" data-method="infusion"><i class="fas fa-pump-medical"></i> <span>پمپ انفوزیون</span></button>
+                </div>
+            </div>
+
+            <!-- Step 2: Solution volume -->
+            <div class="control-group">
+                <label><i class="fas fa-flask"></i> حجم محلول (سی‌سی)</label>
+                <div class="manual-volume-presets" id="manualVolumePresets">
+                    <button class="volume-preset-btn" data-vol="10"><span class="number">10</span><span class="unit-text">cc</span></button>
+                    <button class="volume-preset-btn" data-vol="20"><span class="number">20</span><span class="unit-text">cc</span></button>
+                    <button class="volume-preset-btn active" data-vol="50"><span class="number">50</span><span class="unit-text">cc</span></button>
+                    <button class="volume-preset-btn" data-vol="100" style="display:none;"><span class="number">100</span><span class="unit-text">cc</span></button>
+                    <button class="volume-preset-btn" data-vol="250" style="display:none;"><span class="number">250</span><span class="unit-text">cc</span></button>
+                    <button class="volume-preset-btn" data-vol="500" style="display:none;"><span class="number">500</span><span class="unit-text">cc</span></button>
+                    <button class="volume-preset-btn" data-vol="custom"><span class="custom-text">سایر</span></button>
+                </div>
+                <div class="volume-custom-input" id="manualCustomVolumeRow" style="display:none;">
+                    <input type="number" id="manualCustomVolume" placeholder="حجم دلخواه" min="1" inputmode="numeric">
+                    <span>سی‌سی</span>
+                </div>
+            </div>
+
+            <!-- Step 3: Drug amount -->
+            <div class="control-group">
+                <label><i class="fas fa-vial"></i> مقدار دارو اضافه‌شده به محلول</label>
+                <div class="manual-drug-amount-row">
+                    <input type="number" id="manualDrugAmount" placeholder="مقدار" step="any" min="0" inputmode="decimal" class="manual-amount-input">
+                    <select id="manualDrugUnit" class="manual-unit-select">
+                        <option value="units">واحد (units)</option>
+                        <option value="mg" selected>میلی‌گرم (mg)</option>
+                        <option value="mcg">میکروگرم (mcg)</option>
+                        <option value="g">گرم (g)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Step 4: Desired dose -->
+            <div class="control-group">
+                <label><i class="fas fa-file-medical-alt"></i> دوز درخواستی</label>
+                <div class="manual-drug-amount-row">
+                    <input type="number" id="manualDesiredDose" placeholder="دوز" step="any" min="0" inputmode="decimal" class="manual-amount-input">
+                    <select id="manualDoseUnit" class="manual-unit-select">
+                        <option value="units/hr">units/hr</option>
+                        <option value="mg/hr">mg/hr</option>
+                        <option value="mcg/hr">mcg/hr</option>
+                        <option value="mg/min">mg/min</option>
+                        <option value="mcg/min">mcg/min</option>
+                        <option value="mcg/kg/min">mcg/kg/min</option>
+                        <option value="units/kg/hr">units/kg/hr</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Weight (shown when dose unit contains /kg) -->
+            <div class="calc-toggle-item" id="manualWeightRow" style="display:none;">
+                <div class="weight-input-row" style="display:flex;">
+                    <i class="fas fa-user"></i>
+                    <input type="number" id="manualPatientWeight" placeholder="وزن بیمار" min="1" step="0.1" inputmode="decimal">
+                    <span class="weight-unit latin-inline">kg</span>
+                </div>
+            </div>
+
+            <button class="calculate-btn-enhanced gradient" id="manualCalculateBtn">
+                <i class="fas fa-calculator"></i><span>محاسبه</span>
+            </button>
+
+            <div class="manual-results" id="manualResults" style="display:none; margin-top:16px;">
+                <div class="results-grid-enhanced" style="grid-template-columns: repeat(2, 1fr);">
+                    <div class="result-item-enhanced">
+                        <div class="result-label-enhanced">غلظت محلول</div>
+                        <div class="result-value-enhanced" id="manualConcentration">0</div>
+                        <div class="result-unit-enhanced" id="manualConcentrationUnit"></div>
+                    </div>
+                    <div class="result-item-enhanced">
+                        <div class="result-label-enhanced">مقدار کل دارو</div>
+                        <div class="result-value-enhanced" id="manualTotalDrug">0</div>
+                        <div class="result-unit-enhanced" id="manualTotalDrugUnit"></div>
+                    </div>
+                    <div class="result-item-enhanced highlight gradient" style="grid-column: span 2;">
+                        <div class="result-label-enhanced">سرعت پمپ</div>
+                        <div class="result-value-enhanced" id="manualPumpRate">0</div>
+                        <div class="result-unit-enhanced">cc/hour</div>
+                    </div>
+                </div>
+                <div class="drip-rate-row" id="manualDripRow" style="margin-top:10px;">
+                    <div class="drip-rate-icon"><i class="fas fa-droplet"></i></div>
+                    <div class="drip-rate-body">
+                        <span class="drip-rate-label" id="manualDripLabel">سرعت قطره</span>
+                        <span class="drip-rate-value"><span id="manualDripRate">0</span> <span class="drip-rate-unit">قطره/دقیقه</span></span>
+                    </div>
+                </div>
+                <div class="manual-duration-row" id="manualDurationRow">
+                    <i class="fas fa-clock" style="color:var(--primary);"></i>
+                    <span>زمان تخمینی تزریق: </span>
+                    <strong id="manualDuration">0 ساعت</strong>
+                </div>
+            </div>
+        </div>
+    `;
+    setupManualCalculationFunctionality();
+}
+
+
+function setupManualCalculationFunctionality() {
+    // Method toggle
+    const methodBtns = document.querySelectorAll('#manualSection .method-btn-compact');
+    methodBtns.forEach(btn => btn.addEventListener('click', function() {
+        methodBtns.forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        // Adjust volume presets based on method
+        const isSyringe = this.dataset.method === 'syringe';
+        const syringeVols = [10, 20, 50];
+        const infusionVols = [100, 250, 500];
+        document.querySelectorAll('#manualVolumePresets .volume-preset-btn').forEach(b => {
+            if (!b.dataset.vol || b.dataset.vol === 'custom') return;
+            const vol = parseInt(b.dataset.vol);
+            b.style.display = (isSyringe ? syringeVols : infusionVols).includes(vol) ? '' : 'none';
+        });
+        // Reset active to first visible
+        let firstVisible = null;
+        document.querySelectorAll('#manualVolumePresets .volume-preset-btn').forEach(b => {
+            b.classList.remove('active');
+            if (!firstVisible && b.style.display !== 'none' && b.dataset.vol !== 'custom') firstVisible = b;
+        });
+        if (firstVisible) firstVisible.classList.add('active');
+        fixVolumeButtonColors();
+    }));
+
+    // Volume presets
+    let manualVolume = 50;
+    const volBtns = document.querySelectorAll('#manualVolumePresets .volume-preset-btn');
+    const manualCustomVolumeRow = document.getElementById('manualCustomVolumeRow');
+    volBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            volBtns.forEach(b => b.classList.remove('active'));
+            if (this.dataset.vol === 'custom') {
+                if (manualCustomVolumeRow) manualCustomVolumeRow.style.display = 'flex';
+                this.classList.add('active');
+            } else {
+                if (manualCustomVolumeRow) manualCustomVolumeRow.style.display = 'none';
+                manualVolume = parseInt(this.dataset.vol);
+                this.classList.add('active');
+            }
+            fixVolumeButtonColors();
+        });
+    });
+
+    // Show weight input when dose unit contains /kg
+    const doseUnitSelect = document.getElementById('manualDoseUnit');
+    const manualWeightRow = document.getElementById('manualWeightRow');
+    if (doseUnitSelect) {
+        doseUnitSelect.addEventListener('change', function() {
+            if (manualWeightRow) manualWeightRow.style.display = this.value.includes('/kg') ? 'block' : 'none';
+        });
+    }
+
+    // Calculate
+    document.getElementById('manualCalculateBtn').addEventListener('click', calculateManualInfusion);
+
+    // Close
+    document.getElementById('closeManualBtn').addEventListener('click', () => {
+        document.getElementById('manualSection').style.display = 'none';
+        document.getElementById('calculatorControls').style.display = 'grid';
+        if (DOM.calculateBtnWrap) DOM.calculateBtnWrap.style.display = 'block';
+        const selectedDrugHeader = document.querySelector('.selected-drug-compact');
+        if (selectedDrugHeader) selectedDrugHeader.style.display = 'flex';
+        const drugSidebar = document.querySelector('.drug-sidebar');
+        if (drugSidebar && window.innerWidth < 768) drugSidebar.removeAttribute('style');
+    });
+}
+
+function calculateManualInfusion() {
+    // Get volume
+    let solutionVolume;
+    const activeVolBtn = document.querySelector('#manualVolumePresets .volume-preset-btn.active');
+    if (activeVolBtn?.dataset.vol === 'custom') {
+        solutionVolume = PersianNumbers.parseNumber(document.getElementById('manualCustomVolume')?.value);
+    } else {
+        solutionVolume = activeVolBtn ? parseInt(activeVolBtn.dataset.vol) : NaN;
+    }
+
+    const drugAmount = PersianNumbers.parseNumber(document.getElementById('manualDrugAmount')?.value);
+    const drugUnit = document.getElementById('manualDrugUnit')?.value || 'mg';
+    const desiredDose = PersianNumbers.parseNumber(document.getElementById('manualDesiredDose')?.value);
+    const doseUnit = document.getElementById('manualDoseUnit')?.value || 'mg/hr';
+    const patientWeight = PersianNumbers.parseNumber(document.getElementById('manualPatientWeight')?.value) || 0;
+
+    // Validate
+    if (!solutionVolume || isNaN(solutionVolume) || solutionVolume <= 0) {
+        showToast('خطا', 'حجم محلول را انتخاب کنید', 'error'); return;
+    }
+    if (!drugAmount || isNaN(drugAmount) || drugAmount <= 0) {
+        showToast('خطا', 'مقدار دارو را وارد کنید', 'error');
+        document.getElementById('manualDrugAmount')?.focus(); return;
+    }
+    if (!desiredDose || isNaN(desiredDose) || desiredDose <= 0) {
+        showToast('خطا', 'دوز درخواستی را وارد کنید', 'error');
+        document.getElementById('manualDesiredDose')?.focus(); return;
+    }
+    if (doseUnit.includes('/kg') && (!patientWeight || patientWeight <= 0)) {
+        showToast('خطا', 'وزن بیمار را وارد کنید', 'error');
+        document.getElementById('manualPatientWeight')?.focus(); return;
+    }
+
+    // Normalize drug amount to the dose unit's base unit
+    let drugAmountNorm = drugAmount;
+    if (drugUnit === 'g' && (doseUnit.includes('mg') || doseUnit.includes('mcg'))) drugAmountNorm *= 1000;
+    if (drugUnit === 'mg' && doseUnit.includes('mcg')) drugAmountNorm *= 1000;
+    if (drugUnit === 'mcg' && doseUnit.includes('mg')) drugAmountNorm /= 1000;
+
+    const concentration = drugAmountNorm / solutionVolume; // per cc
+
+    // Convert desired dose to per-hour
+    let dosePerHour = desiredDose;
+    if (doseUnit.includes('/min')) dosePerHour = desiredDose * 60;
+    if (doseUnit.includes('/kg')) {
+        dosePerHour = dosePerHour * patientWeight;
+    }
+
+    const pumpRate = dosePerHour / concentration;
+    const duration = solutionVolume / pumpRate;
+    const { factor: dripFactor, label: dripLabel } = getDripFactor(solutionVolume);
+    const dropsPerMin = (pumpRate * dripFactor) / 60;
+
+    // Display
+    const doseBaseUnit = doseUnit.replace('/hr','').replace('/min','').replace('/kg','').trim();
+    document.getElementById('manualTotalDrug').textContent = PersianNumbers.formatNumber(drugAmount, 1);
+    document.getElementById('manualTotalDrugUnit').innerHTML = `<span class="latin-inline">${drugUnit}</span>`;
+    document.getElementById('manualConcentration').textContent = PersianNumbers.formatNumber(concentration, 3);
+    document.getElementById('manualConcentrationUnit').innerHTML = `<span class="latin-inline">${doseBaseUnit}/cc</span>`;
+    document.getElementById('manualPumpRate').textContent = PersianNumbers.formatNumber(pumpRate, 2);
+
+    const dripRateEl = document.getElementById('manualDripRate');
+    const dripLabelEl = document.getElementById('manualDripLabel');
+    if (dripRateEl) dripRateEl.textContent = PersianNumbers.formatNumber(dropsPerMin, 1);
+    if (dripLabelEl) dripLabelEl.textContent = 'سرعت قطره (' + dripLabel + ')';
+
+    const durationEl = document.getElementById('manualDuration');
+    if (durationEl) durationEl.textContent = PersianNumbers.formatNumber(duration, 1) + ' ساعت';
+
+    document.getElementById('manualResults').style.display = 'block';
+    haptic(40);
+    showToast('موفق', 'محاسبه با موفقیت انجام شد', 'success');
+    setTimeout(() => document.getElementById('manualResults')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+}
+
+
+// ============================================
+// TAB MANAGEMENT
+// ============================================
+function switchTab(tabName) {
+    const tabItems = document.querySelectorAll('.tab-item');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabItems.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+    tabPanes.forEach(pane => {
+        const isActive = pane.id === tabName + 'Tab';
+        pane.classList.toggle('active', isActive);
+        pane.style.display = isActive ? 'block' : 'none';
+    });
+    AppState.currentTab = tabName;
+    if (tabName === 'drugs') loadDrugLibrary();
+    if (tabName === 'tools') {
+        initializeTools();
+        initializeConverters();
+    }
+}
+
+// ============================================
+// THEME
+// ============================================
+function syncThemeModeButtons() {
+    const mode = AppState.settings.themeMode || 'light';
+    document.querySelectorAll('#themeModeButtons .theme-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+}
+
+// ============================================
+// THEME MODE (Light / Dark / Auto)
+// ============================================
+const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+function applyThemeMode() {
+    const mode = AppState.settings.themeMode || 'light';
+    const shouldBeDark = mode === 'dark' ? true : mode === 'auto' ? systemPrefersDark.matches : false;
+    AppState.settings.darkMode = shouldBeDark;
+    AppState.theme = shouldBeDark ? 'dark' : 'light';
+    applySettings();
+    if (DOM.darkModeToggle) DOM.darkModeToggle.checked = shouldBeDark;
+    localStorage.setItem('theme', AppState.theme);
+    saveSettings();
+    syncThemeModeButtons();
+}
+
+function setupThemeModeListener() {
+    systemPrefersDark.addEventListener('change', () => {
+        if (AppState.settings.themeMode === 'auto') applyThemeMode();
+    });
+}
+
+function toggleTheme() {
+    AppState.theme = AppState.theme === 'light' ? 'dark' : 'light';
+    document.body.classList.toggle('dark-mode', AppState.theme === 'dark');
+    AppState.settings.darkMode = AppState.theme === 'dark';
+    AppState.settings.themeMode = AppState.theme === 'dark' ? 'dark' : 'light';
+    saveSettings();
+    const meta = document.getElementById('themeColorMeta');
+    if (meta) meta.content = AppState.theme === 'dark' ? '#1f2937' : '#ffffff';
+    applyTheme(AppState.settings.colorTheme || 'default');
+    const icon = DOM.themeToggle.querySelector('i');
+    if (icon) icon.className = AppState.theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    if (DOM.darkModeToggle) DOM.darkModeToggle.checked = AppState.theme === 'dark';
+    localStorage.setItem('theme', AppState.theme);
+    fixVolumeButtonColors();
+    syncThemeModeButtons();
+}
+
+function loadTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    AppState.theme = savedTheme;
+    document.body.classList.toggle('dark-mode', AppState.theme === 'dark');
+    const icon = DOM.themeToggle?.querySelector('i');
+    if (icon) icon.className = AppState.theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    if (DOM.darkModeToggle) DOM.darkModeToggle.checked = AppState.theme === 'dark';
+    fixVolumeButtonColors();
+    const savedColor = AppState.settings.colorTheme || 'default';
+    if (savedColor !== 'default') applyTheme(savedColor);
+}
+
+// ============================================
+// CONVERTERS — bidirectional live
+// ============================================
+function initializeConverters() {
+    const defaults = { percentageValue:'5', percentageVolume:'100', dripVolume:'500', dripTime:'8', tempC:'37', weightKg:'70' };
+    Object.entries(defaults).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
+    convertPercentageLive();
+    calculateDripRateLive();
+    convertTempLive('c');
+    convertWeightLive('kg');
+}
+
+const ELECTROLYTE_DATA = {
+    sodium:             { mw: 23,  valence: 1 },
+    potassium:          { mw: 39,  valence: 1 },
+    calcium:            { mw: 20,  valence: 2 },
+    magnesium:          { mw: 12,  valence: 2 },
+    sodium_bicarbonate: { mw: 84,  valence: 1 }
+};
+
+function convertElectrolyteLive(source) {
+    const element = document.getElementById('electrolyteElement').value;
+    const data = ELECTROLYTE_DATA[element];
+    if (!data) return;
+    const meqEl = document.getElementById('electrolyteMeq');
+    const mgEl  = document.getElementById('electrolyteMg');
+    const resEl = document.getElementById('electrolyteResult');
+    const eqWeight = data.mw / data.valence;
+    if (source === 'meq') {
+        const meq = parseFloat(meqEl.value);
+        if (!isNaN(meq) && meq >= 0) mgEl.value = parseFloat((meq * eqWeight).toFixed(3));
+    } else if (source === 'mg') {
+        const mg = parseFloat(mgEl.value);
+        if (!isNaN(mg) && mg >= 0) meqEl.value = parseFloat((mg / eqWeight).toFixed(3));
+    }
+    const meq = parseFloat(meqEl.value) || 0;
+    const mg  = parseFloat(mgEl.value)  || 0;
+    if (meq > 0 || mg > 0) {
+        resEl.innerHTML = renderConverterResult([
+            { label: 'mEq', value: meq.toFixed(2) },
+            { label: 'mg',  value: mg.toFixed(2) },
+            { label: 'وزن اکی‌والان', value: eqWeight.toFixed(1) + ' mg/mEq' }
+        ]);
+        resEl.style.display = 'block';
+    }
+}
+
+function convertUnitsLive(source) {
+    const fromSel = document.getElementById('unitFromSelect');
+    const toSel   = document.getElementById('unitToSelect');
+    const fromEl  = document.getElementById('unitFromVal');
+    const toEl    = document.getElementById('unitToVal');
+    const resEl   = document.getElementById('unitResult');
+    const toMcg = { mcg: 1, mg: 1000, g: 1000000 };
+    const fromUnit = fromSel.value, toUnit = toSel.value;
+    if (source === 'from') {
+        const val = parseFloat(fromEl.value);
+        if (!isNaN(val) && val >= 0) {
+            const mcg = val * toMcg[fromUnit];
+            toEl.value = parseFloat((mcg / toMcg[toUnit]).toFixed(6));
+        }
+    } else if (source === 'to') {
+        const val = parseFloat(toEl.value);
+        if (!isNaN(val) && val >= 0) {
+            const mcg = val * toMcg[toUnit];
+            fromEl.value = parseFloat((mcg / toMcg[fromUnit]).toFixed(6));
+        }
+    }
+    const fromVal = parseFloat(fromEl.value) || 0;
+    const toVal   = parseFloat(toEl.value)   || 0;
+    if (fromVal > 0 || toVal > 0) {
+        resEl.innerHTML = renderConverterResult([
+            { label: fromUnit, value: fromVal.toFixed(4) },
+            { label: toUnit,   value: toVal.toFixed(4) }
+        ]);
+        resEl.style.display = 'block';
+    }
+}
+
+function convertPercentageLive() {
+    const pct = parseFloat(document.getElementById('percentageValue').value) || 0;
+    const vol = parseFloat(document.getElementById('percentageVolume').value) || 100;
+    const resEl = document.getElementById('percentageResult');
+    if (pct <= 0) { resEl.style.display = 'none'; return; }
+    const grams = (pct / 100) * vol;
+    const mgPerMl = (pct / 100) * 1000;
+    resEl.innerHTML = renderConverterResult([
+        { label: 'مقدار دارو در محلول', value: grams.toFixed(2) + ' g' },
+        { label: 'غلظت', value: mgPerMl.toFixed(1) + ' mg/mL' },
+        { label: 'غلظت میکروگرمی', value: (mgPerMl * 1000).toFixed(0) + ' mcg/mL' }
+    ]);
+    resEl.style.display = 'block';
+}
+
+function calculateDripRateLive() {
+    const vol    = parseFloat(document.getElementById('dripVolume').value) || 0;
+    const time   = parseFloat(document.getElementById('dripTime').value)   || 0;
+    const factor = parseInt(document.getElementById('dripFactorSelect').value) || 20;
+    const resEl  = document.getElementById('dripResult');
+    if (vol <= 0 || time <= 0) { resEl.style.display = 'none'; return; }
+    const mlPerHr   = vol / time;
+    const dropsMin  = (mlPerHr * factor) / 60;
+    const drops15s  = dropsMin / 4;
+    resEl.innerHTML = renderConverterResult([
+        { label: 'سرعت پمپ',         value: mlPerHr.toFixed(1) + ' mL/hr' },
+        { label: 'قطره در دقیقه',     value: dropsMin.toFixed(1) + ' gtt/min' },
+        { label: 'قطره در ۱۵ ثانیه',  value: Math.round(drops15s) + ' قطره (شمارش در ۱۵ ثانیه)' }
+    ]);
+    resEl.style.display = 'block';
+}
+
+function convertTempLive(source) {
+    const cEl   = document.getElementById('tempC');
+    const fEl   = document.getElementById('tempF');
+    const resEl = document.getElementById('tempResult');
+    if (!cEl || !fEl) return;
+    if (source === 'c') {
+        const c = parseFloat(cEl.value);
+        if (!isNaN(c)) fEl.value = parseFloat(((c * 9/5) + 32).toFixed(1));
+    } else {
+        const f = parseFloat(fEl.value);
+        if (!isNaN(f)) cEl.value = parseFloat(((f - 32) * 5/9).toFixed(1));
+    }
+    const c = parseFloat(cEl.value) || 0;
+    let note = '';
+    if (c < 35)       note = '🔵 هیپوترمی';
+    else if (c < 36.5) note = '⚪ زیر نرمال';
+    else if (c <= 37.5) note = '🟢 طبیعی';
+    else if (c <= 38.5) note = '🟡 تب خفیف';
+    else if (c <= 40)  note = '🟠 تب';
+    else               note = '🔴 تب شدید — اورژانسی';
+    resEl.innerHTML = renderConverterResult([
+        { label: 'سلسیوس',  value: (parseFloat(cEl.value) || 0).toFixed(1) + ' °C' },
+        { label: 'فارنهایت', value: (parseFloat(fEl.value) || 0).toFixed(1) + ' °F' },
+        { label: 'وضعیت',   value: note }
+    ]);
+    resEl.style.display = 'block';
+}
+
+function convertWeightLive(source) {
+    const kgEl  = document.getElementById('weightKg');
+    const lbEl  = document.getElementById('weightLb');
+    const gEl   = document.getElementById('weightG');
+    const resEl = document.getElementById('weightResult');
+    if (!kgEl || !lbEl || !gEl) return;
+    let kg = 0;
+    if (source === 'kg') kg = parseFloat(kgEl.value) || 0;
+    else if (source === 'lb') { kg = (parseFloat(lbEl.value) || 0) / 2.20462; kgEl.value = kg.toFixed(2); }
+    else if (source === 'g')  { kg = (parseFloat(gEl.value) || 0) / 1000; kgEl.value = kg.toFixed(3); }
+    if (kg > 0) {
+        lbEl.value = (kg * 2.20462).toFixed(1);
+        gEl.value  = (kg * 1000).toFixed(0);
+        resEl.innerHTML = renderConverterResult([
+            { label: 'کیلوگرم', value: kg.toFixed(2) + ' kg' },
+            { label: 'پوند',    value: (kg * 2.20462).toFixed(1) + ' lb' },
+            { label: 'گرم',     value: (kg * 1000).toFixed(0) + ' g' }
+        ]);
+        resEl.style.display = 'block';
+    }
+}
+
+function renderConverterResult(rows) {
+    return '<div class="conv-result-list">' + rows.map(r =>
+        '<div class="conv-result-row"><span class="conv-result-label">' + r.label + '</span><strong class="conv-result-value">' + r.value + '</strong></div>'
+    ).join('') + '</div>';
+}
+
+function convertElectrolyte() { convertElectrolyteLive('meq'); }
+function convertPercentage() { convertPercentageLive(); }
+function convertUnits() { convertUnitsLive('from'); }
+function calculateDripRate() { calculateDripRateLive(); }
+
+// ============================================
+// TOOLS
+// ============================================
+function initializeTools() {
+    const defaults = { bmiWeight:'70', bmiHeight:'170', bsaWeight:'70', bsaHeight:'170', ibwHeight:'170', crclAge:'40', crclWeight:'70', crclValue:'1.0' };
+    Object.entries(defaults).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
+    ['compatDrug1','compatDrug2','doseCalcDrugPicker'].forEach(selId => {
+        const sel = document.getElementById(selId);
+        if (!sel || sel.options.length > 1) return;
+        Object.values(drugDatabase).forEach(drug => {
+            const opt = document.createElement('option');
+            opt.value = drug.id;
+            opt.textContent = drug.persianName + ' (' + drug.englishName + ')';
+            sel.appendChild(opt);
+        });
+    });
+}
+
+function calculateBMI() {
+    const weight = PersianNumbers.parseNumber(document.getElementById('bmiWeight').value);
+    const height = PersianNumbers.parseNumber(document.getElementById('bmiHeight').value);
+    const resultDiv = document.getElementById('bmiResult');
+    if (!weight || !height) { showToast('خطا', 'لطفاً وزن و قد را وارد کنید', 'error'); resultDiv.innerHTML = ''; resultDiv.style.display = 'none'; return; }
+    const bmi = weight / Math.pow(height / 100, 2);
+    let cat, color;
+    if (bmi < 18.5)      { cat = 'کمبود وزن';  color = '#60a5fa'; }
+    else if (bmi < 25)   { cat = 'طبیعی';       color = '#34d399'; }
+    else if (bmi < 30)   { cat = 'اضافه وزن';   color = '#fbbf24'; }
+    else                 { cat = 'چاقی';         color = '#f87171'; }
+    resultDiv.innerHTML = renderConverterResult([
+        { label: 'BMI', value: PersianNumbers.formatNumber(bmi, 1) + ' kg/m²' },
+        { label: 'وضعیت', value: `<span style="color:${color};font-weight:700;">${cat}</span>` }
+    ]);
+    resultDiv.style.display = 'block';
+    refreshAccordion(resultDiv);
+}
+
+function calculateBSA() {
+    const weight = PersianNumbers.parseNumber(document.getElementById('bsaWeight').value);
+    const height = PersianNumbers.parseNumber(document.getElementById('bsaHeight').value);
+    const formula = document.getElementById('bsaFormula').value;
+    const resultDiv = document.getElementById('bsaResult');
+    if (!weight || !height) { showToast('خطا', 'لطفاً وزن و قد را وارد کنید', 'error'); resultDiv.innerHTML = ''; resultDiv.style.display = 'none'; return; }
+    let bsa;
+    if (formula === 'mosteller') bsa = Math.sqrt((weight * height) / 3600);
+    else if (formula === 'dubois') bsa = 0.007184 * Math.pow(weight, 0.425) * Math.pow(height, 0.725);
+    else bsa = 0.024265 * Math.pow(weight, 0.5378) * Math.pow(height, 0.3964);
+    resultDiv.innerHTML = renderConverterResult([
+        { label: 'سطح بدن (BSA)', value: PersianNumbers.formatNumber(bsa, 3) + ' m²' },
+        { label: 'فرمول', value: formula === 'mosteller' ? 'Mosteller' : formula === 'dubois' ? 'DuBois' : 'Haycock' }
+    ]);
+    resultDiv.style.display = 'block';
+    refreshAccordion(resultDiv);
+}
+
+function calculateIBW() {
+    const height = PersianNumbers.parseNumber(document.getElementById('ibwHeight').value);
+    const gender = document.getElementById('ibwGender').value;
+    const formula = document.getElementById('ibwFormula').value;
+    const resultDiv = document.getElementById('ibwResult');
+    if (!height) { showToast('خطا', 'لطفاً قد را وارد کنید', 'error'); resultDiv.innerHTML = ''; resultDiv.style.display = 'none'; return; }
+    const hIn = height / 2.54;
+    let ibw;
+    if (formula === 'devine') ibw = gender === 'male' ? 50 + 2.3 * (hIn - 60) : 45.5 + 2.3 * (hIn - 60);
+    else if (formula === 'robinson') ibw = gender === 'male' ? 52 + 1.9 * (hIn - 60) : 49 + 1.7 * (hIn - 60);
+    else ibw = gender === 'male' ? 56.2 + 1.41 * (hIn - 60) : 53.1 + 1.36 * (hIn - 60);
+    resultDiv.innerHTML = renderConverterResult([
+        { label: 'وزن ایده‌آل (IBW)', value: PersianNumbers.formatNumber(ibw, 1) + ' kg' },
+        { label: 'فرمول', value: formula.charAt(0).toUpperCase() + formula.slice(1) }
+    ]);
+    resultDiv.style.display = 'block';
+    refreshAccordion(resultDiv);
+}
+
+function calculateCrCl() {
+    const age = PersianNumbers.parseNumber(document.getElementById('crclAge').value);
+    const weight = PersianNumbers.parseNumber(document.getElementById('crclWeight').value);
+    const creatinine = PersianNumbers.parseNumber(document.getElementById('crclValue').value);
+    const gender = document.getElementById('crclGender').value;
+    const resultDiv = document.getElementById('crclResult');
+    if (!age || !weight || !creatinine) { showToast('خطا', 'لطفاً تمامی مقادیر را وارد کنید', 'error'); resultDiv.innerHTML = ''; resultDiv.style.display = 'none'; return; }
+    let crcl = ((140 - age) * weight) / (72 * creatinine);
+    if (gender === 'female') crcl *= 0.85;
+    let fn, fnColor;
+    if (crcl > 90)       { fn = 'طبیعی';         fnColor = '#34d399'; }
+    else if (crcl > 60)  { fn = 'کاهش خفیف';     fnColor = '#fbbf24'; }
+    else if (crcl > 30)  { fn = 'کاهش متوسط';    fnColor = '#f97316'; }
+    else if (crcl > 15)  { fn = 'کاهش شدید';     fnColor = '#f87171'; }
+    else                 { fn = 'نارسایی کلیه';   fnColor = '#ef4444'; }
+    resultDiv.innerHTML = renderConverterResult([
+        { label: 'کلیرانس کراتینین', value: PersianNumbers.formatNumber(crcl, 0) + ' mL/min' },
+        { label: 'وضعیت کلیه', value: `<span style="color:${fnColor};font-weight:700;">${fn}</span>` },
+        { label: 'توجه', value: crcl < 30 ? 'تنظیم دوز داروهای کلیوی ضروری است' : 'دوز داروها را بر اساس CrCl بررسی کنید' }
+    ]);
+    resultDiv.style.display = 'block';
+    refreshAccordion(resultDiv);
+}
+
+function checkCompatibility() {
+    const drug1Id = document.getElementById('compatDrug1').value;
+    const drug2Id = document.getElementById('compatDrug2').value;
+    const solution = document.getElementById('compatSolution').value;
+    const resultDiv = document.getElementById('compatResult');
+    if (!drug1Id || !drug2Id) { showToast('خطا', 'لطفاً هر دو دارو را انتخاب کنید', 'error'); resultDiv.innerHTML = ''; resultDiv.style.display = 'none'; return; }
+    if (drug1Id === drug2Id) {
+        resultDiv.innerHTML = '<div class="compat-result-box warn"><i class="fas fa-info-circle"></i><span>داروهای یکسان انتخاب شده‌اند</span></div>';
+        resultDiv.style.display = 'block'; return;
+    }
+    const d1 = drugDatabase[drug1Id], d2 = drugDatabase[drug2Id];
+    if (!d1 || !d2) { resultDiv.textContent = 'اطلاعات دارو یافت نشد'; resultDiv.style.display = 'block'; return; }
+
+    const solMap = { NS: 'N.S', D5W: 'D5W', DS: 'D/S', RL: 'RL' };
+    const solKey = solMap[solution] || solution;
+    const d1SolOk = d1.solutionType.some(s => s.replace(/[\s.\/]/g,'').toLowerCase() === solKey.replace(/[\s.\/]/g,'').toLowerCase() || d1.solutionType.includes(solution));
+    const d2SolOk = d2.solutionType.some(s => s.replace(/[\s.\/]/g,'').toLowerCase() === solKey.replace(/[\s.\/]/g,'').toLowerCase() || d2.solutionType.includes(solution));
+
+    const d2EnglishLower = d2.englishName.toLowerCase();
+    const d1EnglishLower = d1.englishName.toLowerCase();
+    const d1Compatibles = (d1.ySiteCompatibilities?.compatible || []).map(s => s.toLowerCase());
+    const d1Incompatibles = (d1.ySiteCompatibilities?.incompatible || []).map(s => s.toLowerCase());
+    const d2Compatibles = (d2.ySiteCompatibilities?.compatible || []).map(s => s.toLowerCase());
+    const d2Incompatibles = (d2.ySiteCompatibilities?.incompatible || []).map(s => s.toLowerCase());
+
+    const d1SaysCompat = d1Compatibles.some(s => s.includes(d2EnglishLower) || s.includes(d2.persianName));
+    const d1SaysIncompat = d1Incompatibles.some(s => s.includes(d2EnglishLower) || s.includes(d2.persianName));
+    const d2SaysCompat = d2Compatibles.some(s => s.includes(d1EnglishLower) || s.includes(d1.persianName));
+    const d2SaysIncompat = d2Incompatibles.some(s => s.includes(d1EnglishLower) || s.includes(d1.persianName));
+
+    const isIncompat = d1SaysIncompat || d2SaysIncompat;
+    const isCompat = (d1SaysCompat || d2SaysCompat) && !isIncompat;
+
+    let solNote = '';
+    if (!d1SolOk) solNote = `<div class="compat-sol-note"><i class="fas fa-exclamation-triangle"></i> ${d1.persianName} معمولاً با ${solution} استفاده نمی‌شود</div>`;
+    else if (!d2SolOk) solNote = `<div class="compat-sol-note"><i class="fas fa-exclamation-triangle"></i> ${d2.persianName} معمولاً با ${solution} استفاده نمی‌شود</div>`;
+
+    let html = '';
+    if (isIncompat) {
+        html = `<div class="compat-result-box danger">
+            <i class="fas fa-times-circle"></i>
+            <div>
+                <strong>${d1.persianName} و ${d2.persianName} ناسازگار هستند</strong>
+                <span>از تزریق همزمان در یک خط خودداری کنید</span>
+            </div>
+        </div>`;
+    } else if (isCompat) {
+        html = `<div class="compat-result-box success">
+            <i class="fas fa-check-circle"></i>
+            <div>
+                <strong>${d1.persianName} و ${d2.persianName} سازگار هستند (Y-Site)</strong>
+                <span>تزریق همزمان در یک خط امکان‌پذیر است</span>
+            </div>
+        </div>`;
+    } else {
+        html = `<div class="compat-result-box warn">
+            <i class="fas fa-question-circle"></i>
+            <div>
+                <strong>اطلاعات کافی در پایگاه داده موجود نیست</strong>
+                <span>قبل از تزریق همزمان با داروساز مشورت کنید</span>
+            </div>
+        </div>`;
+    }
+    resultDiv.innerHTML = html + solNote;
+    resultDiv.style.display = 'block';
+}
+
+function calculateDose() {
+    const needed = PersianNumbers.parseNumber(document.getElementById('doseNeeded').value);
+    const concentration = PersianNumbers.parseNumber(document.getElementById('doseConcentration').value);
+    const vialVolume = PersianNumbers.parseNumber(document.getElementById('doseVialVolume').value);
+    const unit = document.getElementById('doseUnit')?.value || 'mg';
+    const resultDiv = document.getElementById('doseResult');
+    if (!needed || !concentration || !vialVolume) { showToast('خطا', 'لطفاً تمامی مقادیر را وارد کنید', 'error'); resultDiv.innerHTML = ''; resultDiv.style.display = 'none'; return; }
+    if (concentration === 0) { resultDiv.innerHTML = 'غلظت نمی‌تواند صفر باشد'; resultDiv.style.display = 'block'; return; }
+    const volumeNeeded = needed / concentration;
+    const vialsNeeded = Math.ceil(volumeNeeded / vialVolume);
+    const syringes = [1, 2, 3, 5, 10, 20, 50];
+    const bestSyringe = syringes.find(s => s >= volumeNeeded) || 50;
+    const vialText = vialsNeeded > 1 ? ` — ${vialsNeeded} ویال` : ' — ۱ ویال';
+    resultDiv.innerHTML = `
+        <div class="dose-calc-result">
+            <div class="dose-calc-row"><span>حجم مورد نیاز:</span><strong>${PersianNumbers.formatNumber(volumeNeeded, 2)} mL${vialText}</strong></div>
+            <div class="dose-calc-row"><span>سرنگ پیشنهادی:</span><strong>${bestSyringe} mL</strong></div>
+        </div>`;
+    resultDiv.style.display = 'block';
+}
+
+function populateDoseCalcFromDrug() {
+    const sel = document.getElementById('doseCalcDrugPicker');
+    if (!sel) return;
+    const drugId = sel.value;
+    if (!drugId) return;
+    const drug = drugDatabase[drugId];
+    if (!drug) return;
+    const amp = drug.ampouleOptions[0];
+    const conc = amp.strength / amp.volume;
+    const concEl = document.getElementById('doseConcentration');
+    const vialEl = document.getElementById('doseVialVolume');
+    const unitEl = document.getElementById('doseUnit');
+    const concUnitEl = document.getElementById('doseConcentrationUnit');
+    if (concEl) concEl.value = parseFloat(conc.toFixed(3));
+    if (vialEl) vialEl.value = amp.volume;
+    if (unitEl) unitEl.value = amp.unit || 'mg';
+    if (concUnitEl) concUnitEl.textContent = (amp.unit || 'mg') + '/mL';
+    showToast('بارگذاری شد', drug.persianName + ' — غلظت: ' + parseFloat(conc.toFixed(3)) + ' ' + (amp.unit||'mg') + '/mL', 'success');
+}
+
+// ============================================
+// DRUG QUICK REFERENCE — Accordion style
+// ============================================
+function loadDrugLibrary() {
+    const container = document.getElementById('drugLibrary');
+    if (!container) return;
+    if (container.children.length > 0) { wireDrugLibrarySearch(); return; }
+
+    Object.values(drugDatabase).forEach(drug => {
+        let doseRangeDisplay = '--';
+        if (drug.typicalDoseRange) {
+            const minFormatted = drug.typicalDoseRange.min.toFixed(1);
+            const maxFormatted = drug.typicalDoseRange.max.toFixed(1);
+            doseRangeDisplay = `<span dir="ltr" style="display:inline-block; unicode-bidi:isolate; font-family: monospace;">${minFormatted}–${maxFormatted} ${drug.typicalDoseRange.unit}</span>`;
+        }
+        const maxConc = drug.maxSafeConcentration || '--';
+        const solutions = drug.solutionType.join(' / ');
+        const compatible = (drug.ySiteCompatibilities?.compatible || []).slice(0, 5);
+        const incompatible = (drug.ySiteCompatibilities?.incompatible || []).slice(0, 5);
+
+        const ampoulesHTML = drug.ampouleOptions.map(a =>
+            '<div class="qref-ampoule-item"><i class="fas fa-vial"></i><span dir="ltr">' + a.label + '</span></div>'
+        ).join('');
+
+        const item = document.createElement('div');
+        item.className = 'accordion-item qref-accordion-item';
+        item.style.setProperty('--drug-color', drug.color);
+        item.dataset.drugId = drug.id;
+        item.dataset.drugName = drug.persianName.toLowerCase() + ' ' + drug.englishName.toLowerCase();
+        item.innerHTML =
+            '<div class="qref-row" data-body-id="drug-body-' + drug.id + '">' +
+                '<div class="qref-acc-icon" style="background:linear-gradient(135deg,' + drug.color + ',' + drug.color + 'bb)">' +
+                    renderDrugIcon(drug.icon) +
+                '</div>' +
+                '<div class="qref-title-block">' +
+                    '<span class="qref-name">' + drug.persianName + '</span>' +
+                    '<span class="qref-english">' + drug.englishName + ' — ' + drug.category + '</span>' +
+                '</div>' +
+                '<button class="qref-calc-btn" onclick="event.stopPropagation();selectDrug(\'' + drug.id + '\');switchTab(\'calculator\')">' +
+                    '<i class="fas fa-calculator"></i>' +
+                    '<span>محاسبه</span>' +
+                '</button>' +
+                '<div class="qref-chevron">' +
+                    '<i class="fas fa-chevron-down"></i>' +
+                '</div>' +
+            '</div>' +
+            '<div class="accordion-body qref-acc-body" id="drug-body-' + drug.id + '">' +
+                '<div class="qref-info-grid">' +
+                    '<div class="qref-info-row"><span class="qref-info-label"><i class="fas fa-pills"></i> دوز معمول</span><span class="qref-info-val">' + doseRangeDisplay + '</span></div>' +
+                    '<div class="qref-info-row"><span class="qref-info-label"><i class="fas fa-flask"></i> حداکثر غلظت</span><span class="qref-info-val">' + maxConc + '</span></div>' +
+                    '<div class="qref-info-row"><span class="qref-info-label"><i class="fas fa-droplet"></i> محلول‌های سازگار</span><span class="qref-info-val">' + solutions + '</span></div>' +
+                '</div>' +
+                '<div class="qref-ampoule-section">' +
+                    '<div class="qref-ampoule-title"><i class="fas fa-syringe"></i> آمپول‌های موجود</div>' +
+                    '<div class="qref-ampoule-list">' + ampoulesHTML + '</div>' +
+                '</div>' +
+                (compatible.length || incompatible.length ? (
+                    '<div class="qref-compat-grid">' +
+                        '<div class="qref-compat-col compatible">' +
+                            '<div class="qref-compat-title"><i class="fas fa-check-circle"></i> سازگار (Y-Site)</div>' +
+                            (compatible.length ? compatible.map(d => '<div class="qref-compat-item">' + d + '</div>').join('') : '<div class="qref-compat-item muted">—</div>') +
+                        '</div>' +
+                        '<div class="qref-compat-col incompatible">' +
+                            '<div class="qref-compat-title"><i class="fas fa-times-circle"></i> ناسازگار</div>' +
+                            (incompatible.length ? incompatible.map(d => '<div class="qref-compat-item">' + d + '</div>').join('') : '<div class="qref-compat-item muted">—</div>') +
+                        '</div>' +
+                    '</div>'
+                ) : '') +
+                (drug.cautions && drug.cautions.length ? (
+                    '<div class="qref-warnings">' +
+                        '<div class="qref-warnings-title"><i class="fas fa-exclamation-triangle"></i> هشدارها</div>' +
+                        drug.cautions.slice(0, 3).map(c => '<div class="qref-warning-item">' + c + '</div>').join('') +
+                    '</div>'
+                ) : '') +
+            '</div>';
+
+        container.appendChild(item);
+    });
+    wireDrugLibrarySearch();
+}
+
+function wireDrugLibrarySearch() {
+    const input = document.getElementById('librarySearch');
+    const container = document.getElementById('drugLibrary');
+    if (!input || !container || input.dataset.wired) return;
+    input.dataset.wired = 'true';
+    input.addEventListener('input', () => {
+        const term = input.value.trim().toLowerCase();
+        container.querySelectorAll('.qref-accordion-item').forEach(item => {
+            const name = (item.dataset.drugName || '');
+            item.style.display = (!term || name.includes(term)) ? '' : 'none';
+        });
+    });
+
+    if (!container.dataset.delegated) {
+        container.dataset.delegated = 'true';
+        container.addEventListener('click', (e) => {
+            if (e.target.closest('.qref-calc-btn')) return;
+            const row = e.target.closest('.qref-row');
+            if (row && row.dataset.bodyId) {
+                toggleAccordionById(row.dataset.bodyId);
+            }
+        });
+    }
+}
+
+// ============================================
+// UTILITIES
+// ============================================
+function showToast(title, message, type = 'info') {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const icons = { success: 'fas fa-check-circle', error: 'fas fa-times-circle', warning: 'fas fa-exclamation-triangle', info: 'fas fa-info-circle' };
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <i class="toast-icon ${icons[type]}"></i>
+        <div class="toast-content"><div class="toast-title">${title}</div><div class="toast-message">${message}</div></div>
+        <button class="toast-close">&times;</button>
+    `;
+    document.body.appendChild(toast);
+    toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4000);
+}
+
+function updateStats() {}
+function updateCalculationStats() { AppState.calculationsToday++; }
+
+function saveCalculation(totalDrug, concentration, pumpRate, duration) {
+    const history = JSON.parse(localStorage.getItem('calculationHistory') || '[]');
+    history.unshift({
+        id: Date.now(),
+        drug: AppState.selectedDrug,
+        drugName: drugDatabase[AppState.selectedDrug].persianName,
+        dose: AppState.desiredDose,
+        weight: AppState.patientWeight,
+        totalDrug, concentration, pumpRate, duration,
+        timestamp: new Date().toISOString()
+    });
+    if (history.length > 50) history.pop();
+    localStorage.setItem('calculationHistory', JSON.stringify(history));
+}
+
+function loadHistory() {
+    const historyList = document.getElementById('historyList');
+    if (!historyList) return;
+    const history = JSON.parse(localStorage.getItem('calculationHistory') || '[]');
+    if (history.length === 0) { historyList.innerHTML = '<div class="empty-history">تاریخچه‌ای یافت نشد</div>'; return; }
+    historyList.innerHTML = '';
+    history.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.title = 'برای بازیابی کلیک کنید';
+        div.innerHTML = `
+            <div class="history-drug">${item.drugName} <span class="history-restore-hint"><i class="fas fa-rotate-left"></i></span></div>
+            <div class="history-details">
+                <div>دوز: ${PersianNumbers.formatNumber(item.dose, 2)}</div>
+                <div>سرعت پمپ: <span class="latin-inline">${PersianNumbers.formatNumber(item.pumpRate, 2)} cc/hr</span></div>
+                <div class="history-time">${PersianNumbers.toLatin(new Date(item.timestamp).toLocaleDateString('fa-IR'))} — ${new Date(item.timestamp).toLocaleTimeString('fa-IR', {hour:'2-digit', minute:'2-digit'})}</div>
+            </div>
+            <div class="history-restore-bar">بازیابی این محاسبه</div>
+        `;
+        div.addEventListener('click', () => {
+            restoreFromHistory(item);
+        });
+        historyList.appendChild(div);
+    });
+}
+
+// ============================================
+// REVERSE MODE
+// ============================================
+function updateReverseUI() {
+    const doseLabel = document.querySelector('#calculatorControls .control-group:last-of-type > label');
+    const unitEl = document.getElementById('orderUnit');
+    const calcBtnLabel = document.querySelector('#calculateBtn span');
+    const reverseRow = document.querySelector('.reverse-toggle-row');
+    if (AppState.reverseMode) {
+        if (DOM.reverseIosToggle) DOM.reverseIosToggle.classList.add('on');
+        if (reverseRow) reverseRow.classList.add('active');
+        if (doseLabel) doseLabel.innerHTML = '<i class="fas fa-pump-medical"></i> سرعت پمپ';
+        if (unitEl) unitEl.textContent = 'cc/hour';
+        if (DOM.doctorOrder) DOM.doctorOrder.placeholder = '0';
+        if (calcBtnLabel) calcBtnLabel.textContent = 'محاسبه دوز دریافتی';
+    } else {
+        if (DOM.reverseIosToggle) DOM.reverseIosToggle.classList.remove('on');
+        if (reverseRow) reverseRow.classList.remove('active');
+        if (doseLabel) doseLabel.innerHTML = '<i class="fas fa-file-medical-alt"></i> دوز درخواستی';
+        if (DOM.doctorOrder) DOM.doctorOrder.placeholder = '0';
+        if (calcBtnLabel) calcBtnLabel.textContent = 'محاسبه سرعت پمپ';
+        const drug = drugDatabase[AppState.selectedDrug];
+        if (drug && unitEl) {
+            unitEl.textContent = AppState.useWeight && drug.weightBased?.active
+                ? drug.weightBased.unit
+                : (drug.weightBased?.nonWeightUnit || drug.standardUnit);
+        }
+    }
+}
+
+// ============================================
+// DOSE RANGE INDICATOR
+// ============================================
+function updateDoseRangeIndicator() {
+    const drug = drugDatabase[AppState.selectedDrug];
+    if (!drug || !drug.typicalDoseRange || AppState.reverseMode) {
+        if (DOM.doseRangeIndicator) DOM.doseRangeIndicator.style.display = 'none';
+        return;
+    }
+    const raw = DOM.doctorOrder?.value;
+    if (!raw || raw.trim() === '') {
+        if (DOM.doseRangeIndicator) DOM.doseRangeIndicator.style.display = 'none';
+        return;
+    }
+    const val = PersianNumbers.parseNumber(raw);
+    if (isNaN(val) || val <= 0) {
+        if (DOM.doseRangeIndicator) DOM.doseRangeIndicator.style.display = 'none';
+        return;
+    }
+    const { min, max, unit } = drug.typicalDoseRange;
+    let status, color, text;
+    if (val < min * 0.8) {
+        status = 'low'; color = '#60a5fa';
+        text = `پایین‌تر از محدوده معمول (${min}–${max} ${unit})`;
+    } else if (val >= min * 0.8 && val <= max * 1.1) {
+        status = 'ok'; color = '#34d399';
+        text = `در محدوده معمول (${min}–${max} ${unit})`;
+    } else if (val > max * 1.1 && val <= max * 1.5) {
+        status = 'warn'; color = '#fbbf24';
+        text = `بالاتر از محدوده معمول — بررسی شود`;
+    } else {
+        status = 'danger'; color = '#f87171';
+        text = `خارج از محدوده ایمن — دوز را بررسی کنید`;
+    }
+    if (DOM.doseRangeDot) DOM.doseRangeDot.style.background = color;
+    if (DOM.doseRangeText) { DOM.doseRangeText.textContent = text; DOM.doseRangeText.style.color = color; }
+    if (DOM.doseRangeIndicator) DOM.doseRangeIndicator.style.display = 'flex';
+}
+
+// ============================================
+// REVERSE CALCULATION
+// ============================================
+function calculateReverse() {
+    const drug = drugDatabase[AppState.selectedDrug];
+    if (!drug) { showToast('خطا', 'ابتدا یک دارو انتخاب کنید', 'error'); return; }
+    const ampoule = drug.ampouleOptions[AppState.currentAmpouleIndex];
+    const pumpRateVal = PersianNumbers.parseNumber(DOM.doctorOrder.value);
+    if (!pumpRateVal || isNaN(pumpRateVal) || pumpRateVal <= 0) {
+        DOM.doctorOrder.style.borderColor = 'var(--danger)';
+        showToast('خطا', 'لطفاً سرعت پمپ را وارد کنید (cc/hour)', 'error');
+        DOM.doctorOrder.focus();
+        return;
+    }
+    DOM.doctorOrder.style.borderColor = '';
+    const totalDrug = AppState.ampouleCount * ampoule.strength;
+    const concentration = totalDrug / AppState.solutionVolume;
+    let derivedDose = pumpRateVal * concentration;
+    const unit = AppState.useWeight && drug.weightBased?.active ? drug.weightBased.unit : (drug.weightBased?.nonWeightUnit || drug.standardUnit);
+    const isPerMin = unit && unit.toLowerCase().includes('min');
+    if (isPerMin) derivedDose = derivedDose / 60;
+    const isPerKg = unit && unit.toLowerCase().includes('kg');
+    const weight = AppState.useWeight ? (parseFloat(DOM.patientWeight?.dataset.numericValue) || 1) : 1;
+    if (isPerKg && AppState.useWeight) derivedDose = derivedDose / weight;
+    const duration = AppState.solutionVolume / pumpRateVal;
+    displayResultsReverse(totalDrug, concentration, pumpRateVal, derivedDose, duration, ampoule.unit, unit);
+    generateStepByStepGuide(drug, totalDrug, concentration, pumpRateVal, derivedDose);
+    displayWarnings(drug);
+    displayCompatibility(drug);
+    if (AppState.settings.saveHistory) saveCalculation(totalDrug, concentration, pumpRateVal, duration);
+}
+
+function displayResultsReverse(totalDrug, concentration, pumpRate, derivedDose, duration, ampUnit, doseUnit) {
+    const drug = drugDatabase[AppState.selectedDrug];
+    DOM.totalDrugAmount.textContent = PersianNumbers.formatNumber(totalDrug, 0);
+    DOM.totalDrugUnit.innerHTML = `<span class="latin-inline">${ampUnit}</span>`;
+    let concentrationDisplay, concentrationUnitDisplay;
+    const _doseInMcg = (drug.standardUnit || '').startsWith('mcg');
+    const _ampouleInMg = (drug.ampouleOptions[0]?.unit || '') === 'mg';
+    if (_doseInMcg && _ampouleInMg) {
+        concentrationDisplay = PersianNumbers.formatNumber(concentration * 1000, 2);
+        concentrationUnitDisplay = 'mcg/cc';
+    } else {
+        concentrationDisplay = PersianNumbers.formatNumber(concentration, 2);
+        concentrationUnitDisplay = `${ampUnit}/cc`;
+    }
+    DOM.concentrationResult.textContent = concentrationDisplay;
+    DOM.concentrationUnit.innerHTML = `<span class="latin-inline">${concentrationUnitDisplay}</span>`;
+    DOM.pumpRateResult.textContent = PersianNumbers.formatNumber(pumpRate, 2);
+    DOM.pumpRateUnit.innerHTML = `<span class="latin-inline">cc/hour</span>`;
+    DOM.durationResult.textContent = PersianNumbers.formatNumber(duration, 1);
+    DOM.durationUnit.innerHTML = `<span class="persian-inline">ساعت</span>`;
+    const highlightEl = document.querySelector('.result-item-enhanced.highlight');
+    const pumpRateCard = document.getElementById('pumpRateResult')?.closest('.result-item-enhanced');
+    if (highlightEl && pumpRateCard) {
+        highlightEl.classList.remove('highlight');
+    }
+    if (pumpRateCard) {
+        pumpRateCard.classList.add('highlight');
+        const labelEl = pumpRateCard.querySelector('.result-label-enhanced');
+        const valueEl = pumpRateCard.querySelector('.result-value-enhanced');
+        const unitEl = pumpRateCard.querySelector('.result-unit-enhanced');
+        if (labelEl) labelEl.textContent = 'دوز دریافتی';
+        if (valueEl) { valueEl.textContent = PersianNumbers.formatNumber(derivedDose, 2); valueEl.style.color = 'white'; }
+        if (unitEl) { unitEl.innerHTML = `<span class="latin-inline">${doseUnit || ampUnit}</span>`; }
+    }
+    if (DOM.resultsSection) {
+        DOM.resultsSection.classList.add('show');
+        DOM.resultsSection.style.display = 'block';
+        setTimeout(() => DOM.resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+    }
+}
+
+// ============================================
+// RESTORE FROM HISTORY
+// ============================================
+function restoreFromHistory(item) {
+    if (drugDatabase[item.drug]) {
+        selectDrug(item.drug);
+        if (DOM.historyModal) { DOM.historyModal.classList.remove('active'); document.body.classList.remove('no-scroll'); }
+        setTimeout(() => {
+            if (DOM.doctorOrder) {
+                DOM.doctorOrder.value = item.dose;
+                DOM.doctorOrder.dataset.numericValue = item.dose;
+                updateDoseRangeIndicator();
+            }
+            if (item.weight && DOM.patientWeight && DOM.weightCheckbox) {
+                DOM.weightCheckbox.checked = true;
+                AppState.useWeight = true;
+                DOM.patientWeight.disabled = false;
+                if (DOM.weightIosToggle) DOM.weightIosToggle.classList.add('on');
+                if (DOM.weightInputRow) DOM.weightInputRow.style.display = 'flex';
+                DOM.patientWeight.value = item.weight;
+                DOM.patientWeight.dataset.numericValue = item.weight;
+            }
+            showToast('بازیابی شد', `محاسبه ${item.drugName} بازیابی شد`, 'success');
+            haptic(40);
+        }, 300);
+    } else {
+        showToast('خطا', 'این دارو در پایگاه داده یافت نشد', 'error');
+    }
+}
+
+// ============================================
+// EXPORT HISTORY
+// ============================================
+function exportHistory() {
+    const history = JSON.parse(localStorage.getItem('calculationHistory') || '[]');
+    if (history.length === 0) {
+        showToast('اطلاع', 'تاریخچه‌ای برای خروجی وجود ندارد', 'info');
+        return;
+    }
+    const lines = ['MedCalc Pro — تاریخچه محاسبات', '='.repeat(40), ''];
+    history.forEach((item, i) => {
+        const d = new Date(item.timestamp);
+        const dateStr = d.toLocaleDateString('fa-IR') + ' ' + d.toLocaleTimeString('fa-IR', {hour:'2-digit', minute:'2-digit'});
+        lines.push(`#${i + 1} — ${item.drugName}`);
+        lines.push(`تاریخ: ${dateStr}`);
+        lines.push(`دوز: ${item.dose}`);
+        lines.push(`سرعت پمپ: ${parseFloat(item.pumpRate).toFixed(2)} cc/hr`);
+        lines.push(`غلظت: ${parseFloat(item.concentration).toFixed(2)}`);
+        lines.push(`مدت: ${parseFloat(item.duration).toFixed(1)} ساعت`);
+        if (item.weight) lines.push(`وزن بیمار: ${item.weight} kg`);
+        lines.push('-'.repeat(30));
+        lines.push('');
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `FoxiMed-History-${new Date().toISOString().slice(0,10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('خروجی گرفته شد', `${history.length} محاسبه ذخیره شد`, 'success');
+}
+
+// ============================================
+// DRIP RATE CALCULATION
+// ============================================
+function getDripFactor(volumeCC) {
+    if (volumeCC <= 100) return { factor: 60, label: 'میکروست — ۶۰ قطره/mL' };
+    return { factor: 20, label: 'ماکروست — ۲۰ قطره/mL' };
+}
+
+function displayDripRate(pumpRate, volumeCC) {
+    if (!DOM.dripRateRow || !DOM.dripRateResult || !DOM.dripRateLabel) return;
+    const { factor, label } = getDripFactor(volumeCC);
+    const dropsPerMin = (pumpRate * factor) / 60;
+    DOM.dripRateResult.textContent = PersianNumbers.formatNumber(dropsPerMin, 1);
+    DOM.dripRateLabel.textContent = 'سرعت قطره (' + label + ')';
+    DOM.dripRateRow.style.display = 'flex';
+}
+
+// ============================================
+// TAB BAR HEIGHT MEASUREMENT
+// ============================================
+function measureTabBarHeight() {
+    const tabBar = document.querySelector('.tab-bar');
+    const mainContent = document.querySelector('.main-content');
+    if (!tabBar || !mainContent) return false;
+    const rect = tabBar.getBoundingClientRect();
+    const height = rect.height;
+    if (height > 20) {
+        mainContent.style.bottom = height + 'px';
+        document.documentElement.style.setProperty('--tab-bar-height', height + 'px');
+        return true;
+    }
+    return false;
+}
+
+function setupTabBarMeasurement() {
+    if (!measureTabBarHeight()) {
+        const delays = [0, 50, 150, 300, 600, 1000];
+        delays.forEach(d => setTimeout(measureTabBarHeight, d));
+    }
+    window.addEventListener('resize', measureTabBarHeight);
+    window.addEventListener('orientationchange', () => {
+        setTimeout(measureTabBarHeight, 100);
+        setTimeout(measureTabBarHeight, 400);
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) setTimeout(measureTabBarHeight, 200);
+    });
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', measureTabBarHeight);
+    }
+}
+
+// ============================================
+// OFFLINE INDICATOR
+// ============================================
+function setupOfflineIndicator() {
+    const bar = document.createElement('div');
+    bar.id = 'offlineBar';
+    bar.className = 'offline-bar';
+    bar.innerHTML = '<i class="fas fa-wifi-slash"></i> <span>اتصال اینترنت قطع است — اپ به صورت آفلاین کار می‌کند</span>';
+    bar.style.display = 'none';
+    document.body.appendChild(bar);
+
+    function update() {
+        if (!navigator.onLine) {
+            bar.style.display = 'flex';
+            bar.classList.remove('online-flash');
+        } else {
+            bar.classList.add('online-flash');
+            bar.innerHTML = '<i class="fas fa-wifi"></i> <span>اتصال برقرار شد</span>';
+            setTimeout(() => { bar.style.display = 'none'; bar.innerHTML = '<i class="fas fa-wifi-slash"></i> <span>اتصال اینترنت قطع است — اپ به صورت آفلاین کار می‌کند</span>'; }, 2500);
+        }
+    }
+
+    window.addEventListener('offline', update);
+    window.addEventListener('online', update);
+    if (!navigator.onLine) update();
+}
+
+// ============================================
+// SWIPE GESTURE FOR TAB SWITCHING (Mobile)
+// ============================================
+function initSwipe() {
+    if (window.innerWidth > 768) return;
+    const container = document.querySelector('.main-content');
+    if (!container) return;
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    let swipeLocked = false;
+    const minHorizontalDistance = 80;
+    const maxVerticalDistance = 50;
+
+    function isInsideHScrollable(el) {
+        while (el && el !== container) {
+            const style = window.getComputedStyle(el);
+            const overflowX = style.overflowX;
+            const canScrollH = overflowX === 'auto' || overflowX === 'scroll';
+            if (canScrollH && el.scrollWidth > el.clientWidth + 2) return true;
+            el = el.parentElement;
+        }
+        return false;
+    }
+
+    container.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+        swipeLocked = isInsideHScrollable(e.target);
+    }, { passive: true });
+
+    container.addEventListener('touchend', (e) => {
+        if (swipeLocked) return;
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        const diffX = Math.abs(touchEndX - touchStartX);
+        const diffY = Math.abs(touchEndY - touchStartY);
+        if (diffX < minHorizontalDistance || diffY > diffX) return;
+        const direction = (touchEndX - touchStartX) > 0 ? 'right' : 'left';
+        const tabs = ['calculator', 'drugs', 'tools'];
+        const current = AppState.currentTab;
+        let newIndex = tabs.indexOf(current);
+        if (direction === 'right') {
+            newIndex = (newIndex - 1 + tabs.length) % tabs.length;
+        } else {
+            newIndex = (newIndex + 1) % tabs.length;
+        }
+        if (newIndex !== tabs.indexOf(current)) {
+            switchTab(tabs[newIndex]);
+            haptic(20);
+        }
+    }, { passive: true });
+}
+
+// ============================================
+// REVERSE TOOLTIP
+// ============================================
+function showReverseTooltip() {
+    const overlay = DOM.reverseTooltip;
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+    const okBtn = document.getElementById('reverseTooltipOk');
+    const close = () => {
+        overlay.classList.remove('visible');
+        setTimeout(() => { overlay.style.display = 'none'; }, 350);
+        localStorage.setItem('reverseTooltipSeen', 'true');
+    };
+    if (okBtn) okBtn.addEventListener('click', close, { once: true });
+    overlay.querySelector('.reverse-tooltip-backdrop')?.addEventListener('click', close, { once: true });
+}
+
+// ============================================
+// ONBOARDING
+// ============================================
+function setupOnboarding() {
+    const overlay = document.getElementById('onboardingOverlay');
+    if (!overlay) return;
+
+    const slidesContainer = document.getElementById('tutorialSlides');
+    const dotsContainer = document.getElementById('tutorialDots');
+    const nextBtn = document.getElementById('tutorialNextBtn');
+    const skipBtn = document.getElementById('tutorialSkipBtn');
+    const dontShowChk = document.getElementById('onboardingDontShow');
+
+    const slides = slidesContainer ? Array.from(slidesContainer.querySelectorAll('.tutorial-slide')) : [];
+    let current = 0;
+
+    if (dotsContainer && slides.length) {
+        slides.forEach((_, i) => {
+            const dot = document.createElement('span');
+            dot.className = 'tutorial-dot' + (i === 0 ? ' active' : '');
+            dot.addEventListener('click', () => goTo(i));
+            dotsContainer.appendChild(dot);
+        });
+    }
+
+    function updateDots() {
+        if (!dotsContainer) return;
+        dotsContainer.querySelectorAll('.tutorial-dot').forEach((d, i) => {
+            d.classList.toggle('active', i === current);
+        });
+    }
+
+    function goTo(idx) {
+        if (!slides.length) return;
+        slides[current].classList.remove('active');
+        current = Math.max(0, Math.min(idx, slides.length - 1));
+        slides[current].classList.add('active');
+        updateDots();
+        const isLast = current === slides.length - 1;
+        if (nextBtn) {
+            nextBtn.innerHTML = isLast
+                ? '<i class="fas fa-check"></i> <span>شروع</span>'
+                : '<span>بعدی</span> <i class="fas fa-arrow-left"></i>';
+        }
+        haptic(15);
+    }
+
+    function closeTutorial() {
+        overlay.classList.remove('visible');
+        setTimeout(() => { overlay.style.display = 'none'; }, 400);
+        if (dontShowChk && dontShowChk.checked) localStorage.setItem('onboardingSeen', 'true');
+    }
+
+    if (nextBtn) nextBtn.addEventListener('click', () => {
+        if (current < slides.length - 1) goTo(current + 1);
+        else { haptic(30); closeTutorial(); }
+    });
+    if (skipBtn) skipBtn.addEventListener('click', () => { closeTutorial(); });
+    overlay.querySelector('.onboarding-backdrop')?.addEventListener('click', closeTutorial);
+
+    let touchStartX = 0;
+    if (slidesContainer) {
+        slidesContainer.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
+        slidesContainer.addEventListener('touchend', e => {
+            const diff = e.changedTouches[0].screenX - touchStartX;
+            if (Math.abs(diff) > 50) goTo(current + (diff < 0 ? 1 : -1));
+        }, { passive: true });
+    }
+
+    const seen = localStorage.getItem('onboardingSeen');
+    if (!seen) {
+        setTimeout(() => {
+            overlay.style.display = 'flex';
+            requestAnimationFrame(() => overlay.classList.add('visible'));
+        }, 3500);
+    }
+}
+
+window.showTutorial = function() {
+    const settingsModal = document.getElementById('settingsModal');
+    if (settingsModal && settingsModal.classList.contains('active')) {
+        settingsModal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    const overlay = document.getElementById('onboardingOverlay');
+    if (!overlay) return;
+    const slides = overlay.querySelectorAll('.tutorial-slide');
+    slides.forEach((s, i) => s.classList.toggle('active', i === 0));
+    const dots = overlay.querySelectorAll('.tutorial-dot');
+    dots.forEach((d, i) => d.classList.toggle('active', i === 0));
+    const nextBtn = document.getElementById('tutorialNextBtn');
+    if (nextBtn) nextBtn.innerHTML = '<span>بعدی</span> <i class="fas fa-arrow-left"></i>';
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+};
+
+// ============================================
+// UPDATE AVAILABLE BANNER
+// ============================================
+let _pendingWorker = null;
+
+function showUpdateBanner() {
+    if (document.getElementById('updateBanner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'updateBanner';
+    banner.className = 'update-banner';
+    banner.innerHTML =
+        '<div class="update-banner-icon"><i class="fas fa-rocket"></i></div>' +
+        '<div class="update-banner-text">' +
+            '<div class="update-banner-title">نسخه جدید FoxiMed آماده است</div>' +
+            '<div class="update-banner-sub">برای دریافت آخرین تغییرات بروزرسانی کنید</div>' +
+        '</div>' +
+        '<button class="update-banner-btn" id="doUpdateBtn"><i class="fas fa-download"></i> بروزرسانی</button>' +
+        '<button class="update-banner-dismiss" id="dismissBannerBtn"><i class="fas fa-times"></i></button>';
+    document.body.appendChild(banner);
+    haptic(40);
+
+    document.getElementById('doUpdateBtn').addEventListener('click', () => {
+        if (_pendingWorker) {
+            _pendingWorker.postMessage({ type: 'SKIP_WAITING' });
+        } else {
+            window.location.reload();
+        }
+    });
+    document.getElementById('dismissBannerBtn').addEventListener('click', () => {
+        banner.style.animation = 'none';
+        banner.style.opacity = '0';
+        banner.style.transform = 'translateY(-10px) scale(0.96)';
+        banner.style.transition = 'all 0.25s ease';
+        setTimeout(() => banner.remove(), 260);
+    });
+}
+
+function setupUpdateDetection() {
+    if (!('serviceWorker' in navigator)) return;
+
+    let firstInstall = localStorage.getItem('sw_first_install') === null;
+    if (firstInstall) {
+        localStorage.setItem('sw_first_install', 'true');
+    }
+
+    navigator.serviceWorker.ready.then(reg => {
+        if (reg.waiting && !firstInstall) {
+            _pendingWorker = reg.waiting;
+            showUpdateBanner();
+        }
+        reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (!newWorker) return;
+            newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller && !firstInstall) {
+                    _pendingWorker = newWorker;
+                    showUpdateBanner();
+                }
+            });
+        });
+    });
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (localStorage.getItem('sw_first_install') === 'true') {
+            localStorage.setItem('sw_first_install', 'false');
+        } else {
+            setTimeout(() => window.location.reload(), 300);
+        }
+    });
+}
+
+// ============================================
+// THEME COLOR SYSTEM
+// ============================================
+const THEMES = {
+    default: {
+        light: {
+            '--primary':          '#667eea',
+            '--primary-dark':     '#5a67d8',
+            '--primary-light':    'rgba(102,126,234,0.1)',
+            '--gradient-primary': 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
+            '--secondary':        '#f093fb',
+        },
+        dark: {
+            '--primary':          '#60a5fa',
+            '--primary-dark':     '#3b82f6',
+            '--primary-light':    'rgba(96,165,250,0.15)',
+            '--gradient-primary': 'linear-gradient(135deg,#60a5fa 0%,#34d399 100%)',
+            '--secondary':        '#c084fc',
+        }
+    },
+    fox: {
+        light: {
+            '--primary':          '#ea580c',
+            '--primary-dark':     '#c2410c',
+            '--primary-light':    'rgba(234,88,12,0.1)',
+            '--gradient-primary': 'linear-gradient(135deg,#f97316 0%,#dc2626 100%)',
+            '--secondary':        '#fbbf24',
+        },
+        dark: {
+            '--primary':          '#fb923c',
+            '--primary-dark':     '#f97316',
+            '--primary-light':    'rgba(251,146,60,0.15)',
+            '--gradient-primary': 'linear-gradient(135deg,#fb923c 0%,#ef4444 100%)',
+            '--secondary':        '#fcd34d',
+        }
+    },
+    ocean: {
+        light: {
+            '--primary':          '#0284c7',
+            '--primary-dark':     '#0369a1',
+            '--primary-light':    'rgba(2,132,199,0.1)',
+            '--gradient-primary': 'linear-gradient(135deg,#0ea5e9 0%,#0d9488 100%)',
+            '--secondary':        '#38bdf8',
+        },
+        dark: {
+            '--primary':          '#38bdf8',
+            '--primary-dark':     '#0ea5e9',
+            '--primary-light':    'rgba(56,189,248,0.15)',
+            '--gradient-primary': 'linear-gradient(135deg,#38bdf8 0%,#2dd4bf 100%)',
+            '--secondary':        '#7dd3fc',
+        }
+    },
+    rose: {
+        light: {
+            '--primary':          '#e11d48',
+            '--primary-dark':     '#be123c',
+            '--primary-light':    'rgba(225,29,72,0.1)',
+            '--gradient-primary': 'linear-gradient(135deg,#f43f5e 0%,#ec4899 100%)',
+            '--secondary':        '#fb7185',
+        },
+        dark: {
+            '--primary':          '#fb7185',
+            '--primary-dark':     '#f43f5e',
+            '--primary-light':    'rgba(251,113,133,0.15)',
+            '--gradient-primary': 'linear-gradient(135deg,#fb7185 0%,#f472b6 100%)',
+            '--secondary':        '#fda4af',
+        }
+    },
+    forest: {
+        light: {
+            '--primary':          '#16a34a',
+            '--primary-dark':     '#15803d',
+            '--primary-light':    'rgba(22,163,74,0.1)',
+            '--gradient-primary': 'linear-gradient(135deg,#22c55e 0%,#14b8a6 100%)',
+            '--secondary':        '#4ade80',
+        },
+        dark: {
+            '--primary':          '#4ade80',
+            '--primary-dark':     '#22c55e',
+            '--primary-light':    'rgba(74,222,128,0.15)',
+            '--gradient-primary': 'linear-gradient(135deg,#4ade80 0%,#2dd4bf 100%)',
+            '--secondary':        '#86efac',
+        }
+    }
+};
+
+function applyTheme(themeName) {
+    const isDark = AppState.theme === 'dark';
+    const palette = THEMES[themeName] || THEMES.default;
+    const vars = isDark ? palette.dark : palette.light;
+    const root = document.documentElement;
+    const allVars = ['--primary','--primary-dark','--primary-light','--gradient-primary','--secondary'];
+    if (themeName === 'default') {
+        allVars.forEach(k => root.style.removeProperty(k));
+    } else {
+        Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+    }
+    const meta = document.getElementById('themeColorMeta');
+    if (meta) meta.content = isDark ? '#1f2937' : '#ffffff';
+    document.querySelectorAll('.theme-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.theme === themeName);
+    });
+    AppState.settings.colorTheme = themeName;
+    saveSettings();
+}
+
+function setupThemePicker() {
+    document.querySelectorAll('.theme-swatch').forEach(btn => {
+        btn.addEventListener('click', () => {
+            haptic(25);
+            applyTheme(btn.dataset.theme);
+        });
+    });
+    const saved = AppState.settings.colorTheme || 'default';
+    applyTheme(saved);
+}
+
+// ============================================
+// ACCORDION
+// ============================================
+let _accordionFloatBar = null;
+let _accordionScrollHandler = null;
+
+function removeAccordionFloatBar() {
+    if (_accordionFloatBar) { _accordionFloatBar.remove(); _accordionFloatBar = null; }
+    if (_accordionScrollHandler) {
+        const pane = document.querySelector('.tab-pane.active');
+        if (pane) pane.removeEventListener('scroll', _accordionScrollHandler);
+        _accordionScrollHandler = null;
+    }
+}
+
+function addAccordionFloatBar(item, headerBtn) {
+    removeAccordionFloatBar();
+    const titleEl = headerBtn.querySelector('.accordion-title');
+    const iconEl  = headerBtn.querySelector('.accordion-icon-wrap i');
+    const title   = titleEl ? titleEl.textContent : 'بستن';
+    const iconClass = iconEl ? iconEl.className : 'fas fa-chevron-up';
+
+    const bar = document.createElement('div');
+    bar.className = 'accordion-float-bar';
+    bar.innerHTML = `
+        <div class="accordion-float-left">
+            <i class="${iconClass}"></i>
+            <span>${title}</span>
+        </div>
+        <button class="accordion-float-close"><i class="fas fa-times"></i> بستن</button>
+    `;
+    bar.querySelector('.accordion-float-close').addEventListener('click', () => {
+        toggleAccordion(headerBtn);
+    });
+    document.body.appendChild(bar);
+    _accordionFloatBar = bar;
+
+    const pane = document.querySelector('.tab-pane.active') || window;
+    _accordionScrollHandler = () => {
+        const headerRect = headerBtn.getBoundingClientRect();
+        if (headerRect.bottom < 60) {
+            bar.classList.add('visible');
+        } else {
+            bar.classList.remove('visible');
+        }
+    };
+    pane.addEventListener('scroll', _accordionScrollHandler, { passive: true });
+}
+
+function toggleAccordion(headerBtn) {
+    const item = headerBtn.closest('.accordion-item');
+    const body = item.querySelector('.accordion-body');
+    const chevron = headerBtn.querySelector('.accordion-chevron');
+    const isOpen = item.classList.contains('open');
+
+    document.querySelectorAll('.accordion-item.open').forEach(openItem => {
+        if (openItem !== item) {
+            openItem.classList.remove('open');
+            openItem.querySelector('.accordion-body').style.maxHeight = '0';
+            openItem.querySelector('.accordion-body').style.padding = '0';
+            openItem.querySelector('.accordion-chevron').style.transform = '';
+        }
+    });
+
+    if (isOpen) {
+        item.classList.remove('open');
+        body.style.maxHeight = '0';
+        body.style.padding = '0';
+        chevron.style.transform = '';
+        removeAccordionFloatBar();
+        if (history.state && history.state.accordionOpen) history.back();
+    } else {
+        item.classList.add('open');
+        body.style.maxHeight = body.scrollHeight + 2000 + 'px';
+        body.style.padding = '0 0 14px';
+        chevron.style.transform = 'rotate(180deg)';
+        haptic(20);
+        addAccordionFloatBar(item, headerBtn);
+        history.pushState({ accordionOpen: true }, '');
+        setTimeout(() => item.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+    }
+}
+
+window.addEventListener('popstate', () => {
+    const openItem = document.querySelector('.accordion-item.open');
+    if (openItem) {
+        const hBtn = openItem.querySelector('.accordion-header');
+        if (hBtn) {
+            openItem.classList.remove('open');
+            const body = openItem.querySelector('.accordion-body');
+            if (body) { body.style.maxHeight = '0'; body.style.padding = '0'; }
+            const chev = hBtn.querySelector('.accordion-chevron');
+            if (chev) chev.style.transform = '';
+            removeAccordionFloatBar();
+        }
+    }
+});
+
+function refreshAccordion(el) {
+    const body = el.closest('.accordion-body');
+    if (body && body.closest('.accordion-item.open')) {
+        body.style.maxHeight = body.scrollHeight + 2000 + 'px';
+    }
+}
+
+function toggleAccordionById(bodyId) {
+    const body = document.getElementById(bodyId);
+    if (!body) return;
+    const item = body.closest('.accordion-item');
+    if (!item) return;
+    const chevronIcon = item.querySelector('.qref-chevron i');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.qref-accordion-item.open').forEach(openItem => {
+        if (openItem !== item) {
+            openItem.classList.remove('open');
+            const b = openItem.querySelector('.accordion-body');
+            if (b) { b.style.maxHeight = '0'; b.style.padding = '0'; }
+            const c = openItem.querySelector('.qref-chevron i');
+            if (c) c.style.transform = '';
+        }
+    });
+    if (isOpen) {
+        item.classList.remove('open');
+        body.style.maxHeight = '0';
+        body.style.padding = '0';
+        if (chevronIcon) chevronIcon.style.transform = '';
+    } else {
+        item.classList.add('open');
+        body.style.maxHeight = body.scrollHeight + 1000 + 'px';
+        body.style.padding = '0 12px 12px';
+        if (chevronIcon) chevronIcon.style.transform = 'rotate(180deg)';
+        haptic(20);
+        setTimeout(() => item.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 200);
+    }
+}
+
+// ============================================
+// GCS CALCULATOR
+// ============================================
+const GCS_STATE = { eye: null, verbal: null, motor: null };
+
+function setupGCS() {
+    document.querySelectorAll('.gcs-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            haptic(25);
+            const domain = btn.dataset.domain;
+            const score = parseInt(btn.dataset.score);
+            btn.closest('.gcs-btn-group').querySelectorAll('.gcs-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            GCS_STATE[domain] = score;
+            const scoreMap = { eye: 'eScore', verbal: 'vScore', motor: 'mScore' };
+            const scoreEl = document.getElementById(scoreMap[domain]);
+            if (scoreEl) scoreEl.textContent = score;
+            updateGCS();
+        });
+    });
+
+    const resetBtn = document.getElementById('gcsResetBtn');
+    if (resetBtn) resetBtn.addEventListener('click', resetGCS);
+}
+
+function updateGCS() {
+    const { eye, verbal, motor } = GCS_STATE;
+    if (eye === null || verbal === null || motor === null) return;
+
+    const total = eye + verbal + motor;
+    const totalEl = document.getElementById('gcsTotalScore');
+    const formulaEl = document.getElementById('gcsTotalFormula');
+    const badgeEl = document.getElementById('gcsSeverityBadge');
+    const notesEl = document.getElementById('gcsNotes');
+    const boxEl = document.getElementById('gcsResultBox');
+
+    if (totalEl) totalEl.textContent = total;
+    if (formulaEl) formulaEl.textContent = `E${eye} + V${verbal} + M${motor}`;
+
+    let severity, badgeClass, notes;
+
+    if (total >= 13) {
+        severity = 'خفیف';
+        badgeClass = 'gcs-badge-mild';
+        notes = [
+            'سطح هوشیاری خوب — بیمار پاسخ‌دهی مناسب دارد',
+            'پایش مداوم علائم حیاتی توصیه می‌شود',
+            'در صورت کاهش GCS بلافاصله گزارش دهید'
+        ];
+    } else if (total >= 9) {
+        severity = 'متوسط';
+        badgeClass = 'gcs-badge-moderate';
+        notes = [
+            'اختلال هوشیاری متوسط — نیاز به مراقبت ویژه دارد',
+            'پایش مداوم راه هوایی ضروری است',
+            'خطر آسپیراسیون وجود دارد — وضعیت بیمار را مدیریت کنید',
+            'بررسی مکرر GCS هر ۱ تا ۲ ساعت'
+        ];
+    } else {
+        severity = 'شدید — کُما';
+        badgeClass = 'gcs-badge-severe';
+        notes = [
+            '⚠️ GCS ≤ ۸: آستانه اینتوباسیون — راه هوایی را ایمن کنید',
+            'خطر بالای آسپیراسیون و انسداد راه هوایی',
+            'بیمار نیاز به ICU و مراقبت‌های ویژه دارد',
+            'پزشک را فوری مطلع کنید',
+            'پایش ICP در صورت آسیب مغزی توصیه می‌شود'
+        ];
+    }
+
+    if (badgeEl) {
+        badgeEl.textContent = `شدت: ${severity}`;
+        badgeEl.className = `gcs-severity-badge ${badgeClass}`;
+    }
+
+    if (notesEl) {
+        notesEl.innerHTML = notes.map(n => `<div class="gcs-note-item"><i class="fas fa-circle-info"></i><span>${n}</span></div>`).join('');
+    }
+
+    if (boxEl) {
+        boxEl.style.display = 'block';
+        refreshAccordion(boxEl);
+        setTimeout(() => boxEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 150);
+    }
+    haptic(40);
+}
+
+function resetGCS() {
+    GCS_STATE.eye = null;
+    GCS_STATE.verbal = null;
+    GCS_STATE.motor = null;
+    document.querySelectorAll('.gcs-btn').forEach(b => b.classList.remove('active'));
+    ['eScore','vScore','mScore'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '—';
+    });
+    const box = document.getElementById('gcsResultBox');
+    if (box) box.style.display = 'none';
+    haptic(30);
+}
+
+// ============================================
+// BURNS / TBSA CALCULATOR
+// ============================================
+
+const BURNS_ADULT = {
+    head: 4.5, head_b: 4.5,
+    neck: 1,
+    chest: 9, abdomen: 9,
+    upper_back: 9, lower_back: 9,
+    perineum: 1,
+    buttocks: 2.5,
+    l_upper_arm: 2, r_upper_arm: 2,
+    l_upper_arm_b: 2, r_upper_arm_b: 2,
+    l_lower_arm: 1.5, r_lower_arm: 1.5,
+    l_lower_arm_b: 1.5, r_lower_arm_b: 1.5,
+    l_hand: 1.25, r_hand: 1.25,
+    l_thigh_f: 4.75, r_thigh_f: 4.75,
+    l_thigh_b: 4.75, r_thigh_b: 4.75,
+    l_leg_f: 3.5, r_leg_f: 3.5,
+    l_leg_b: 3.5, r_leg_b: 3.5,
+    l_foot: 1.75, r_foot: 1.75
+};
+
+const BURNS_PEDIATRIC = {
+    head: 9.5, head_b: 9.5,
+    neck: 1,
+    chest: 9, abdomen: 9,
+    upper_back: 9, lower_back: 9,
+    perineum: 1,
+    buttocks: 2.5,
+    l_upper_arm: 2, r_upper_arm: 2,
+    l_upper_arm_b: 2, r_upper_arm_b: 2,
+    l_lower_arm: 1.5, r_lower_arm: 1.5,
+    l_lower_arm_b: 1.5, r_lower_arm_b: 1.5,
+    l_hand: 1.25, r_hand: 1.25,
+    l_thigh_f: 3.25, r_thigh_f: 3.25,
+    l_thigh_b: 3.25, r_thigh_b: 3.25,
+    l_leg_f: 2.75, r_leg_f: 2.75,
+    l_leg_b: 2.75, r_leg_b: 2.75,
+    l_foot: 1.75, r_foot: 1.75
+};
+
+const BURNS_STATE = { selected: new Set(), ageMode: 'adult' };
+
+function setupBurns() {
+    document.querySelectorAll('.burns-region').forEach(region => {
+        region.addEventListener('click', () => {
+            haptic(20);
+            const key = region.dataset.region;
+            if (BURNS_STATE.selected.has(key)) {
+                BURNS_STATE.selected.delete(key);
+                document.querySelectorAll(`[data-region="${key}"]`).forEach(el => el.classList.remove('selected'));
+            } else {
+                BURNS_STATE.selected.add(key);
+                document.querySelectorAll(`[data-region="${key}"]`).forEach(el => el.classList.add('selected'));
+            }
+            updateBurns();
+        });
+    });
+}
+
+function setBurnsAge(mode) {
+    BURNS_STATE.ageMode = mode;
+    const adultBtn = document.getElementById('burnsAdultBtn');
+    const pedBtn = document.getElementById('burnsPedBtn');
+    const noteEl = document.getElementById('burnsRuleNote');
+    if (adultBtn) adultBtn.classList.toggle('active', mode === 'adult');
+    if (pedBtn) pedBtn.classList.toggle('active', mode === 'pediatric');
+    if (noteEl) noteEl.textContent = mode === 'adult' ? 'قانون نُه — بزرگسال' : 'Lund-Browder — کودک (تقریبی)';
+    updateBurns();
+    haptic(25);
+}
+
+function updateBurns() {
+    const table = BURNS_STATE.ageMode === 'adult' ? BURNS_ADULT : BURNS_PEDIATRIC;
+    let total = 0;
+    BURNS_STATE.selected.forEach(key => { total += (table[key] || 0); });
+    total = Math.min(total, 100);
+
+    const tbsaEl = document.getElementById('burnsTBSA');
+    const resultBox = document.getElementById('burnsResultBox');
+    const chipsEl = document.getElementById('burnsChips');
+    const notesEl = document.getElementById('burnsNotes');
+
+    if (chipsEl) {
+        if (BURNS_STATE.selected.size === 0) {
+            chipsEl.innerHTML = '<span class="burns-chips-placeholder">هیچ ناحیه‌ای انتخاب نشده</span>';
+        } else {
+            const labels = [];
+            BURNS_STATE.selected.forEach(key => {
+                const el = document.querySelector(`[data-region="${key}"]`);
+                if (el) labels.push(el.dataset.label);
+            });
+            chipsEl.innerHTML = labels.map(l => `<span class="burns-chip">${l}</span>`).join('');
+        }
+    }
+
+    if (BURNS_STATE.selected.size === 0) {
+        if (resultBox) resultBox.style.display = 'none';
+        refreshAccordion(chipsEl || document.getElementById('burnsChips'));
+        return;
+    }
+
+    if (tbsaEl) tbsaEl.textContent = total.toFixed(1) + '%';
+
+    let notes = [];
+    if (total < 10) {
+        notes = ['سوختگی محدود — مراقبت سرپایی ممکن است کافی باشد', 'درصورت درگیری صورت، دست یا پرینه: ارجاع به مرکز سوختگی'];
+    } else if (total < 20) {
+        notes = ['سوختگی متوسط — بستری ضروری است', 'احیاء مایع را شروع کنید (فرمول Parkland)', 'پایش ادرار ساعتی توصیه می‌شود (۰.۵ cc/kg/hr)'];
+    } else if (total < 40) {
+        notes = ['⚠️ سوختگی وسیع — ICU ضروری است', 'فوری فرمول Parkland را شروع کنید', '۵۰٪ مایع اول ۸ ساعت، ۵۰٪ باقی ۱۶ ساعت', 'ارجاع فوری به مرکز تخصصی سوختگی'];
+    } else {
+        notes = ['🚨 سوختگی حیاتی — خطر جدی برای بیمار', 'انتقال فوری به مرکز تخصصی سوختگی', 'احیاء مایع تهاجمی فوری', 'پایش راه هوایی — احتمال سوختگی استنشاقی را بررسی کنید'];
+    }
+
+    if (notesEl) {
+        notesEl.innerHTML = notes.map(n => `<div class="burns-note-item"><i class="fas fa-circle-info"></i><span>${n}</span></div>`).join('');
+    }
+
+    if (resultBox) {
+        resultBox.style.display = 'block';
+        refreshAccordion(resultBox);
+    }
+
+    updateParkland();
+}
+
+function updateParkland() {
+    const weightEl = document.getElementById('burnsWeight');
+    const parklandEl = document.getElementById('parklandResult');
+    const parklandRow = document.getElementById('parklandRow');
+    if (!weightEl || !parklandEl || !parklandRow) return;
+
+    const weight = parseFloat(weightEl.value);
+    const table = BURNS_STATE.ageMode === 'adult' ? BURNS_ADULT : BURNS_PEDIATRIC;
+    let total = 0;
+    BURNS_STATE.selected.forEach(key => { total += (table[key] || 0); });
+    total = Math.min(total, 100);
+
+    if (!weight || weight <= 0 || BURNS_STATE.selected.size === 0) {
+        parklandRow.style.display = 'none';
+        return;
+    }
+
+    const totalFluid = 4 * weight * total;
+    const first8h = totalFluid / 2;
+    const next16h = totalFluid / 2;
+    parklandEl.innerHTML = '<span dir="ltr" style="display:inline-block; unicode-bidi:isolate;">' + totalFluid.toFixed(0) + ' mL</span>';
+    parklandRow.querySelector('.burns-result-label').innerHTML = 'Parkland: <span dir="ltr" style="display:inline-block; unicode-bidi:isolate;">' + totalFluid.toFixed(0) + ' mL</span> (اول ۸ ساعت: <span dir="ltr">' + first8h.toFixed(0) + ' mL</span> | ۱۶ ساعت باقی: <span dir="ltr">' + next16h.toFixed(0) + ' mL</span>)';
+    parklandRow.style.display = 'flex';
+}
+
+function resetBurns() {
+    BURNS_STATE.selected.clear();
+    document.querySelectorAll('.burns-region').forEach(el => el.classList.remove('selected'));
+    const chipsEl = document.getElementById('burnsChips');
+    if (chipsEl) chipsEl.innerHTML = '<span class="burns-chips-placeholder">هیچ ناحیه‌ای انتخاب نشده</span>';
+    const resultBox = document.getElementById('burnsResultBox');
+    if (resultBox) resultBox.style.display = 'none';
+    const weightEl = document.getElementById('burnsWeight');
+    if (weightEl) weightEl.value = '';
+    haptic(30);
+}
+
+// ============================================
+// GLOBALS
+// ============================================
+window.selectDrug = selectDrug;
+window.switchTab = switchTab;
+window.calculateManualInfusion = calculateManualInfusion;
+window.convertElectrolyte = convertElectrolyte;
+window.convertElectrolyteLive = convertElectrolyteLive;
+window.convertUnitsLive = convertUnitsLive;
+window.convertPercentageLive = convertPercentageLive;
+window.calculateDripRateLive = calculateDripRateLive;
+window.convertTempLive = convertTempLive;
+window.convertWeightLive = convertWeightLive;
+window.convertPercentage = convertPercentage;
+window.convertUnits = convertUnits;
+window.calculateDripRate = calculateDripRate;
+window.calculateBMI = calculateBMI;
+window.calculateBSA = calculateBSA;
+window.calculateIBW = calculateIBW;
+window.calculateCrCl = calculateCrCl;
+window.checkCompatibility = checkCompatibility;
+window.calculateDose = calculateDose;
+window.TextDirection = TextDirection;
+window.PersianNumbers = PersianNumbers;
+window.exportHistory = exportHistory;
+window.toggleAccordion = toggleAccordion;
+window.applyTheme = applyTheme;
+window.showUpdateBanner = showUpdateBanner;
+window.toggleAccordionById = toggleAccordionById;
+window.setBurnsAge = setBurnsAge;
+window.resetBurns = resetBurns;
+window.updateParkland = updateParkland;
+window.restoreFromHistory = restoreFromHistory;
+window.updateDoseRangeIndicator = updateDoseRangeIndicator;
+window.openAccordionById = openAccordionById;
+
+// ============================================
+// USER NAME & GREETING BANNER
+// ============================================
+function getGreeting() {
+    const h   = new Date().getHours();
+    const raw = (localStorage.getItem('userName') || '').trim();
+    const n   = raw ? '\u2066' + raw + '\u2069' : '';
+    const app = '\u2066FoxiMed\u2069';
+
+    const morning = n ? [
+        `صبح بخیر ${n} عزیز 🌅`,
+        `سلام ${n}! امیدوارم شیفت امروز آروم باشه ☀️`,
+        `صبح بخیر ${n} — ${app} در خدمت شماست 🌤️`,
+        `${n} عزیز، صبح بخیر 🌸 آماده‌ی یه شیفت خوب هستیم`,
+        `خوش اومدی ${n} 🌅 از اینکه تو کارت بهت کمک کنم خوشحال میشم`,
+        `سلام ${n}! روزت بخیر ☀️ بریم شروع کنیم`,
+        `${n} عزیز، ما با هم ترکیب خیلی خوبی هستیم 🌅`,
+    ] : [
+        `صبح بخیر! روز پرانرژی‌ای داشته باشید 🌅`,
+        `صبح بخیر 🌤️ — ${app} در خدمت شماست`,
+        `سلام! امیدوارم شیفت امروز آروم باشه ☀️`,
+        `صبح بخیر! از اینکه تو کارتون بهتون کمک کنم خوشحال میشم 🌸`,
+        `خوش اومدید 🌅 ${app} آماده‌ی محاسبه‌ست`,
+        `سلام! ما با هم ترکیب خیلی خوبی هستیم ☀️`,
+        `صبح بخیر! هرموقع کمک بخواید اینجام 🌤️`,
+    ];
+
+    const afternoon = n ? [
+        `روزت بخیر ${n}! وسط شیفت همه چیز خوبه؟ 🌞`,
+        `سلام ${n}! بعدازظهر بخیر 💊`,
+        `${n} عزیز، روزت بخیر — بریم حساب کنیم 🌞`,
+        `سلام ${n}! هرموقع کمک بخوای اینجام 💉`,
+        `روزت بخیر ${n}! ${app} کنارتونه 🌞`,
+        `${n} عزیز، از اینکه تو کارت بهت کمک کنم خیلی خوشحال میشم 🌞`,
+    ] : [
+        `ظهر بخیر! ${app} آماده محاسبه است 🌞`,
+        `روزتون بخیر! مراقب خودتون باشید 💊`,
+        `سلام! هرموقع کمک بخواید اینجام 🌞`,
+        `روزتون بخیر! ${app} کنارتونه 💉`,
+        `سلام! از اینکه تو کارتون بهتون کمک کنم خوشحال میشم 🌞`,
+        `ظهر بخیر! ما با هم ترکیب خیلی خوبی هستیم 🌞`,
+    ];
+
+    const evening = n ? [
+        `عصر بخیر ${n}! شیفت عصر رو با آرامش طی کنید 🌆`,
+        `سلام ${n}! عصر بخیر 🌇`,
+        `${n} عزیز، عصر بخیر — ${app} اینجاست 🌆`,
+        `عصر بخیر ${n}! هرموقع کمک بخوای اینجام ☕`,
+        `سلام ${n}! از اینکه تو کارت بهت کمک کنم خیلی خوشحال میشم 🌇`,
+        `${n} عزیز، ما با هم ترکیب خیلی خوبی هستیم 🌆`,
+    ] : [
+        `عصر بخیر! شیفت عصر رو با آرامش طی کنید 🌆`,
+        `عصر بخیر! ${app} همراه شماست 🌇`,
+        `سلام! هرموقع کمک بخواید اینجام ☕`,
+        `عصر بخیر! از اینکه تو کارتون بهتون کمک کنم خوشحال میشم 🌆`,
+        `سلام! ما با هم ترکیب خیلی خوبی هستیم 🌇`,
+        `عصر بخیر! ${app} آماده‌ست 🌆`,
+    ];
+
+    const night = n ? [
+        `شب بخیر ${n} 🌙 شیفت شب رو با موفقیت پشت سر بذارید`,
+        `سلام ${n}! مواظب خودتون باشید در شیفت شب ⭐`,
+        `${n} عزیز، شب بخیر 🌙 — ${app} همیشه بیداره`,
+        `شب بخیر ${n}! شیفت شب سنگینه ولی شما از پسش برمیاین 💫`,
+        `سلام ${n}! هرموقع کمک بخوای اینجام 🌙`,
+        `${n} عزیز، از اینکه تو کارت بهت کمک کنم خیلی خوشحال میشم ⭐`,
+        `شب بخیر ${n}! ما با هم ترکیب خیلی خوبی هستیم 🌙`,
+        `${n} عزیز، مراقب خودت باش ⭐ ${app} کنارته`,
+    ] : [
+        `شب بخیر 🌙 شیفت شب رو با موفقیت پشت سر بذارید`,
+        `شب بخیر! مواظب خودتون باشید ⭐`,
+        `${app} همیشه بیداره 🌙 — شب بخیر`,
+        `شب بخیر! شیفت شب سنگینه ولی شما از پسش برمیاین 💫`,
+        `سلام! هرموقع کمک بخواید اینجام 🌙`,
+        `شب بخیر! از اینکه تو کارتون بهتون کمک کنم خوشحال میشم ⭐`,
+        `شب بخیر! ما با هم ترکیب خیلی خوبی هستیم 🌙`,
+    ];
+
+    let pool;
+    if      (h >= 5  && h < 12) pool = morning;
+    else if (h >= 12 && h < 17) pool = afternoon;
+    else if (h >= 17 && h < 21) pool = evening;
+    else                         pool = night;
+
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+
+function showGreetingBanner() {
+    const banner = document.getElementById('greetingBanner');
+    const textEl = document.getElementById('greetingText');
+    const closeBtn = document.getElementById('greetingClose');
+    if (!banner || !textEl) return;
+
+    textEl.textContent = getGreeting();
+
+    banner.style.display = 'flex';
+    banner.classList.remove('banner-hiding');
+    banner.classList.add('banner-visible');
+
+    let autoDismiss = setTimeout(dismissBanner, 4500);
+
+    function dismissBanner() {
+        clearTimeout(autoDismiss);
+        banner.classList.add('banner-hiding');
+        banner.addEventListener('animationend', () => { banner.style.display = 'none'; }, { once: true });
+    }
+
+    closeBtn.addEventListener('click', dismissBanner);
+}
+
+function setupUserName() {
+    const input   = document.getElementById('userNameInput');
+    const saveBtn = document.getElementById('userNameSaveBtn');
+    const hint    = document.getElementById('userNameHint');
+    if (!input || !saveBtn) return;
+
+    let storedName = localStorage.getItem('userName') || '';
+
+    function updateButtonState() {
+        const currentValue = input.value.trim();
+        const isValid = currentValue !== '' && currentValue !== storedName;
+        if (isValid) {
+            saveBtn.classList.add('active');
+        } else {
+            saveBtn.classList.remove('active');
+        }
+    }
+
+    function saveName() {
+        if (!saveBtn.classList.contains('active')) return;
+        const newName = input.value.trim();
+        localStorage.setItem('userName', newName);
+        storedName = newName;
+        if (hint) {
+            hint.textContent = newName ? `نام ذخیره شد: ${newName}` : 'نامی ذخیره نشده';
+            hint.classList.add('hint-saved');
+            setTimeout(() => {
+                hint.textContent = 'برای ذخیره Enter بزنید یا روی ✓ کلیک کنید';
+                hint.classList.remove('hint-saved');
+            }, 2000);
+        }
+        updateButtonState();
+    }
+
+    input.value = storedName;
+    updateButtonState();
+
+    input.addEventListener('input', updateButtonState);
+    saveBtn.addEventListener('click', saveName);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (saveBtn.classList.contains('active')) {
+                saveName();
+                input.blur();
+            }
+        }
+    });
+}
+
+// ============================================
+// CONTEXTUAL HELP POPOVERS
+// ============================================
+const HELP_TEXTS = {
+    method: 'روش تزریق دارو را مشخص می‌کند.\n«پمپ سرنگ» برای حجم‌های کم (۱۰–۵۰ سی‌سی) و «پمپ انفوزیون» برای حجم‌های بیشتر (۱۰۰–۱۰۰۰ سی‌سی) استفاده می‌شود. انتخاب روش، گزینه‌های حجم را تغییر می‌دهد.',
+    volume: 'حجم کل محلولی که دارو در آن حل می‌شود را وارد کنید (سی‌سی).\nمثلاً اگر ۵۰ سی‌سی انتخاب کنید، دارو در ۵۰ سی‌سی سرم حل شده و غلظت و سرعت پمپ بر این اساس محاسبه می‌شود.',
+    ampoule: 'تعداد آمپول یا ویال دارویی که به محلول اضافه می‌کنید را مشخص کنید.\nبرای انسولین و برخی داروها می‌توانید مقدار دقیق واحد یا میلی‌گرم اضافه‌شده را مستقیماً وارد کنید.',
+    dose: 'دوز درخواستی پزشک را اینجا وارد کنید.\nواحد دوز بسته به دارو متفاوت است (مثلاً واحد/ساعت، میکروگرم/کیلوگرم/دقیقه). پس از وارد کردن دوز، دکمه محاسبه را بزنید.',
+    weight: 'وقتی این گزینه فعال است، دوز بر اساس وزن بیمار محاسبه می‌شود.\nمثلاً اگر دوز ۰.۱ واحد/کیلوگرم/ساعت باشد و وزن بیمار ۷۰ کیلوگرم، دوز کل ۷ واحد/ساعت خواهد بود.',
+    reverse: 'با فعال کردن این گزینه، به جای وارد کردن دوز، سرعت پمپ (سی‌سی/ساعت) را وارد می‌کنید و دوز دریافتی بیمار محاسبه می‌شود.',
+    ysite: 'Y-Site به نقطه‌ای در ست سرم گفته می‌شود که دو دارو از دو خط مختلف به یک ورید تزریق می‌شوند.\nسازگاری Y-Site یعنی آیا این دو دارو می‌توانند همزمان از یک ورید تزریق شوند بدون اینکه واکنش شیمیایی داشته باشند یا رسوب تشکیل دهند.\n⚠️ همیشه با داروساز مشورت کنید.',
+};
+
+function setupHelpPopovers() {
+    const popover = document.getElementById('helpPopover');
+    const popoverText = document.getElementById('helpPopoverText');
+    if (!popover || !popoverText) return;
+
+    let activeBtn = null;
+
+    function showPopover(btn) {
+        const key = btn.dataset.help;
+        const text = HELP_TEXTS[key];
+        if (!text) return;
+        popoverText.innerHTML = text.replace(/\n/g, '<br>');
+        popover.style.display = 'block';
+        const btnRect = btn.getBoundingClientRect();
+        const popRect = popover.getBoundingClientRect();
+        const scrollY = window.scrollY || 0;
+        let top = btnRect.bottom + scrollY + 8;
+        let left = btnRect.left - popRect.width / 2 + btnRect.width / 2;
+        const margin = 12;
+        left = Math.max(margin, Math.min(left, window.innerWidth - popRect.width - margin));
+        popover.style.top = top + 'px';
+        popover.style.left = left + 'px';
+        const arrowLeft = (btnRect.left + btnRect.width / 2) - left;
+        popover.querySelector('.help-popover-arrow').style.right = 'auto';
+        popover.querySelector('.help-popover-arrow').style.left = Math.max(12, arrowLeft) + 'px';
+        activeBtn = btn;
+        btn.classList.add('active');
+    }
+
+    function hidePopover() {
+        popover.style.display = 'none';
+        if (activeBtn) { activeBtn.classList.remove('active'); activeBtn = null; }
+    }
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.help-icon');
+        if (btn) {
+            e.stopPropagation();
+            if (activeBtn === btn) { hidePopover(); return; }
+            showPopover(btn);
+            return;
+        }
+        if (!popover.contains(e.target)) hidePopover();
+    });
+
+    document.addEventListener('scroll', hidePopover, { passive: true });
+    window.addEventListener('resize', hidePopover, { passive: true });
+}
+
+// ============================================
+// RASS — Richmond Agitation-Sedation Scale
+// ============================================
+function setupRASS() {
+    const levels = document.querySelectorAll('#rassAccordionBody .rass-level');
+    levels.forEach(level => {
+        level.addEventListener('click', () => {
+            haptic(25);
+            levels.forEach(l => l.classList.remove('selected'));
+            level.classList.add('selected');
+            const score = parseInt(level.dataset.score);
+            updateRASS(score);
+        });
+    });
+    const resetBtn = document.getElementById('rassResetBtn');
+    if (resetBtn) resetBtn.addEventListener('click', resetRASS);
+}
+
+function updateRASS(score) {
+    const box = document.getElementById('rassResultBox');
+    const scoreEl = document.getElementById('rassResultScore');
+    const labelEl = document.getElementById('rassResultLabel');
+    const noteEl = document.getElementById('rassResultNote');
+
+    const data = {
+        4:  { label: 'خشونت آشکار', color: '#ef4444', note: '⚠️ نیاز فوری به مداخله — خطر برای کادر درمان. داروی آرام‌بخش سریع الاثر تجویز شود.' },
+        3:  { label: 'بسیار آژیته', color: '#f97316', note: '⚠️ ارزیابی علت آژیتاسیون (درد، هیپوکسی، دلیریوم). مداخله دارویی احتمالاً لازم است.' },
+        2:  { label: 'آژیته', color: '#f97316', note: 'بررسی علل قابل درمان (درد، احتباس ادراری). تنظیم دوز آرام‌بخش را در نظر بگیرید.' },
+        1:  { label: 'بی‌قرار', color: '#fbbf24', note: 'پایش مداوم. بررسی علل محیطی نگرانی بیمار.' },
+        0:  { label: 'هوشیار و آرام', color: '#22c55e', note: '✓ سطح هدف آرام‌بخشی در ICU. ادامه پایش.' },
+        '-1': { label: 'خواب‌آلود', color: '#0ea5e9', note: 'در مرز قابل قبول. پایش پاسخ به صدا.' },
+        '-2': { label: 'سداسیون خفیف', color: '#6366f1', note: 'هدف قابل قبول برای بیماران تحت ونتیلاتور. بررسی روزانه برای کاهش دوز.' },
+        '-3': { label: 'سداسیون متوسط', color: '#8b5cf6', note: 'بررسی نیاز بالینی. در صورت امکان کاهش دوز را در نظر بگیرید.' },
+        '-4': { label: 'سداسیون عمیق', color: '#a855f7', note: '⚠️ فقط در موارد خاص (ICP بالا، برونکواسپاسم شدید). بررسی روزانه ضروری است.' },
+        '-5': { label: 'بی‌هوشی', color: '#7c3aed', note: '⚠️ سداسیون بسیار عمیق. ارزیابی ضروری بودن این سطح. خطر عوارض بالا است.' },
+    };
+
+    const key = score.toString();
+    const d = data[key];
+    if (!d) return;
+
+    if (scoreEl) {
+        scoreEl.textContent = score > 0 ? `+${score}` : score;
+        scoreEl.style.color = d.color;
+    }
+    if (labelEl) labelEl.textContent = d.label;
+    if (noteEl) noteEl.textContent = d.note;
+    if (box) {
+        box.style.display = 'block';
+        box.style.borderColor = d.color + '40';
+        refreshAccordion(box);
+        setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 150);
+    }
+    haptic(40);
+}
+
+function resetRASS() {
+    document.querySelectorAll('#rassAccordionBody .rass-level').forEach(l => l.classList.remove('selected'));
+    const box = document.getElementById('rassResultBox');
+    if (box) box.style.display = 'none';
+    haptic(30);
+}
+
+// ============================================
+// BRADEN SCALE
+// ============================================
+const BRADEN_STATE = { sensory: null, moisture: null, activity: null, mobility: null, nutrition: null, friction: null };
+const BRADEN_SCORE_IDS = {
+    sensory: 'bradenSensoryScore', moisture: 'bradenMoistureScore',
+    activity: 'bradenActivityScore', mobility: 'bradenMobilityScore',
+    nutrition: 'bradenNutritionScore', friction: 'bradenFrictionScore'
+};
+
+function setupBraden() {
+    document.querySelectorAll('#bradenAccordionBody .gcs-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            haptic(25);
+            const domain = btn.dataset.braden;
+            const score = parseInt(btn.dataset.score);
+            btn.closest('.gcs-btn-group').querySelectorAll('.gcs-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            BRADEN_STATE[domain] = score;
+            const el = document.getElementById(BRADEN_SCORE_IDS[domain]);
+            if (el) el.textContent = score;
+            updateBraden();
+        });
+    });
+    const resetBtn = document.getElementById('bradenResetBtn');
+    if (resetBtn) resetBtn.addEventListener('click', resetBraden);
+}
+
+function updateBraden() {
+    const vals = Object.values(BRADEN_STATE);
+    if (vals.some(v => v === null)) return;
+    const total = vals.reduce((a, b) => a + b, 0);
+
+    const totalEl = document.getElementById('bradenTotalScore');
+    const badgeEl = document.getElementById('bradenSeverityBadge');
+    const notesEl = document.getElementById('bradenNotes');
+    const box = document.getElementById('bradenResultBox');
+
+    if (totalEl) totalEl.textContent = total;
+
+    let severity, badgeClass, notes;
+    if (total >= 19) {
+        severity = 'ریسک ندارد';
+        badgeClass = 'gcs-badge-mild';
+        notes = ['پوست سالم است.', 'آموزش پیشگیری به بیمار و خانواده توصیه می‌شود.'];
+    } else if (total >= 15) {
+        severity = 'ریسک خفیف';
+        badgeClass = 'gcs-badge-mild';
+        notes = ['تغییر وضعیت هر ۲ ساعت.', 'مراقبت از پوست و تغذیه مناسب.'];
+    } else if (total >= 13) {
+        severity = 'ریسک متوسط';
+        badgeClass = 'gcs-badge-moderate';
+        notes = ['تغییر وضعیت هر ۱–۲ ساعت.', 'استفاده از تشک فشارزدا توصیه می‌شود.', 'ارزیابی روزانه پوست.'];
+    } else if (total >= 10) {
+        severity = 'ریسک بالا';
+        badgeClass = 'gcs-badge-severe';
+        notes = ['⚠️ ریسک بالای زخم فشاری.', 'تغییر وضعیت هر ۱ ساعت.', 'تشک تخصصی پیشگیری از زخم ضروری است.', 'بررسی و مستندسازی وضعیت پوست در هر شیفت.'];
+    } else {
+        severity = 'ریسک بسیار بالا';
+        badgeClass = 'gcs-badge-severe';
+        notes = ['🚨 ریسک بسیار بالا.', 'پروتکل پیشگیری فشرده فعال شود.', 'تشک تخصصی + تغییر وضعیت هر ۱ ساعت.', 'مشاوره تیم زخم و پوست.', 'بررسی تغذیه و هیدراسیون فوری.'];
+    }
+
+    if (badgeEl) { badgeEl.textContent = `خطر: ${severity}`; badgeEl.className = `gcs-severity-badge ${badgeClass}`; }
+    if (notesEl) notesEl.innerHTML = notes.map(n => `<div class="gcs-note-item"><i class="fas fa-circle-info"></i><span>${n}</span></div>`).join('');
+    if (box) { box.style.display = 'block'; refreshAccordion(box); setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 150); }
+    haptic(40);
+}
+
+function resetBraden() {
+    Object.keys(BRADEN_STATE).forEach(k => BRADEN_STATE[k] = null);
+    document.querySelectorAll('#bradenAccordionBody .gcs-btn').forEach(b => b.classList.remove('active'));
+    Object.values(BRADEN_SCORE_IDS).forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+    const box = document.getElementById('bradenResultBox');
+    if (box) box.style.display = 'none';
+    haptic(30);
+}
+
+// ============================================
+// MORSE FALL SCALE
+// ============================================
+const MORSE_STATE = { fallHistory: null, secDiag: null, aid: null, iv: null, gait: null, mental: null };
+const MORSE_SCORE_IDS = {
+    fallHistory: 'morseFallHistoryScore', secDiag: 'morseSecDiagScore',
+    aid: 'morseAidScore', iv: 'morseIVScore', gait: 'morseGaitScore', mental: 'morseMentalScore'
+};
+
+function setupMorse() {
+    document.querySelectorAll('#morseAccordionBody .gcs-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            haptic(25);
+            const domain = btn.dataset.morse;
+            const score = parseInt(btn.dataset.score);
+            btn.closest('.gcs-btn-group').querySelectorAll('.gcs-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            MORSE_STATE[domain] = score;
+            const el = document.getElementById(MORSE_SCORE_IDS[domain]);
+            if (el) el.textContent = score;
+            updateMorse();
+        });
+    });
+    const resetBtn = document.getElementById('morseResetBtn');
+    if (resetBtn) resetBtn.addEventListener('click', resetMorse);
+}
+
+function updateMorse() {
+    const vals = Object.values(MORSE_STATE);
+    if (vals.some(v => v === null)) return;
+    const total = vals.reduce((a, b) => a + b, 0);
+
+    const totalEl = document.getElementById('morseTotalScore');
+    const badgeEl = document.getElementById('morseSeverityBadge');
+    const notesEl = document.getElementById('morseNotes');
+    const box = document.getElementById('morseResultBox');
+
+    if (totalEl) totalEl.textContent = total;
+
+    let severity, badgeClass, notes;
+    if (total < 25) {
+        severity = 'ریسک کم';
+        badgeClass = 'gcs-badge-mild';
+        notes = ['ریسک سقوط پایین.', 'مراقبت استاندارد ایمنی کافی است.'];
+    } else if (total <= 50) {
+        severity = 'ریسک متوسط';
+        badgeClass = 'gcs-badge-moderate';
+        notes = ['⚠️ ریسک متوسط سقوط.', 'پروتکل پیشگیری از سقوط فعال شود.', 'آموزش به بیمار و خانواده.', 'نرده تخت بالا باشد.'];
+    } else {
+        severity = 'ریسک بالا';
+        badgeClass = 'gcs-badge-severe';
+        notes = ['🚨 ریسک بالای سقوط.', 'پروتکل پیشگیری فشرده فعال شود.', 'نظارت مداوم یا ناظر بالینی.', 'دستبند قرمز ریسک سقوط نصب شود.', 'محیط بیمار ایمن‌سازی شود (کفپوش، نور کافی).', 'مرور داروهای موثر بر تعادل (آرام‌بخش، ادرارآور).'];
+    }
+
+    if (badgeEl) { badgeEl.textContent = `خطر: ${severity}`; badgeEl.className = `gcs-severity-badge ${badgeClass}`; }
+    if (notesEl) notesEl.innerHTML = notes.map(n => `<div class="gcs-note-item"><i class="fas fa-circle-info"></i><span>${n}</span></div>`).join('');
+    if (box) { box.style.display = 'block'; refreshAccordion(box); setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 150); }
+    haptic(40);
+}
+
+function resetMorse() {
+    Object.keys(MORSE_STATE).forEach(k => MORSE_STATE[k] = null);
+    document.querySelectorAll('#morseAccordionBody .gcs-btn').forEach(b => b.classList.remove('active'));
+    Object.values(MORSE_SCORE_IDS).forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+    const box = document.getElementById('morseResultBox');
+    if (box) box.style.display = 'none';
+    haptic(30);
+}
+
+// ============================================
+// OXYGEN CYLINDER CALCULATOR
+// ============================================
+function setupOxygenCalculator() {
+    const presets = document.querySelectorAll('#oxySizePresets .volume-preset-btn');
+    const sizeInput = document.getElementById('oxyCylinderSize');
+    presets.forEach(btn => {
+        btn.addEventListener('click', function() {
+            presets.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            if (sizeInput) {
+                sizeInput.value = this.dataset.oxysize;
+                sizeInput.dataset.numericValue = this.dataset.oxysize;
+            }
+            fixVolumeButtonColors();
+        });
+    });
+    ['oxyCylinderSize','oxyPressure','oxyFlow'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', function() {
+            const normalized = PersianNumbers.toLatin(this.value);
+            if (normalized !== this.value) this.value = normalized;
+        });
+    });
+    if (sizeInput) sizeInput.value = '5';
+}
+
+window.calculateOxygen = function() {
+    const cylinderSize = PersianNumbers.parseNumber(document.getElementById('oxyCylinderSize')?.value);
+    const pressure     = PersianNumbers.parseNumber(document.getElementById('oxyPressure')?.value);
+    const flow         = PersianNumbers.parseNumber(document.getElementById('oxyFlow')?.value);
+    const resultBox    = document.getElementById('oxyResult');
+
+    if (!cylinderSize || isNaN(cylinderSize) || cylinderSize <= 0) { showToast('خطا', 'حجم کپسول را وارد کنید', 'error'); return; }
+    if (!pressure     || isNaN(pressure)     || pressure <= 0)     { showToast('خطا', 'فشار کپسول را وارد کنید', 'error'); return; }
+    if (!flow         || isNaN(flow)         || flow <= 0)         { showToast('خطا', 'جریان اکسیژن را وارد کنید', 'error'); return; }
+
+    const totalVolume = cylinderSize * pressure;
+    const usableVolume = totalVolume * 0.9;
+    const durationMinutes = usableVolume / flow;
+    const hours = Math.floor(durationMinutes / 60);
+    const minutes = Math.round(durationMinutes % 60);
+
+    const durationEl = document.getElementById('oxyDuration');
+    const totalVolEl = document.getElementById('oxyTotalVol');
+
+    if (durationEl) {
+        if (hours > 0) {
+            durationEl.textContent = `${hours} ساعت و ${minutes} دقیقه`;
+        } else {
+            durationEl.textContent = `${minutes} دقیقه`;
+        }
+    }
+    if (totalVolEl) totalVolEl.textContent = totalVolume.toFixed(0);
+    if (resultBox) resultBox.style.display = 'block';
+    haptic(40);
+    setTimeout(() => resultBox?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+};
+
+// ============================================
+// Y-SITE COMPATIBILITY MATRIX
+// ============================================
+
+// Comprehensive bidirectional compatibility matrix
+// Status: 'y' = compatible, 'n' = incompatible, '?' = unknown/caution
+// Based on standard ICU pharmacy references (Micromedex, King Guide, Trissel's)
+const YSITE_MATRIX = {
+    // 'y' = Compatible (well-established Y-site data)
+    // 'n' = Incompatible (precipitation/physical incompatibility confirmed)
+    // 'v' = Verify locally (conflicting or limited evidence)
+    // '?' = No reliable Y-site data found
+
+    // ── AMIODARONE ──
+    'amiodarone|dobutamine':'y', 'amiodarone|dopamine':'y', 'amiodarone|fentanyl':'y',
+    'amiodarone|heparin':'v',    // conflicting data — some formulations incompatible
+    'amiodarone|insulin':'?', 'amiodarone|labetalol':'?',
+    'amiodarone|lasix':'n', 'amiodarone|lidocaine':'y', 'amiodarone|midazolam':'y',
+    'amiodarone|norepinephrine':'y', 'amiodarone|octreotide':'?',
+    'amiodarone|pantoprazole':'n', 'amiodarone|tng':'y',
+    'amiodarone|morphine':'y', 'amiodarone|propofol':'y',
+    'amiodarone|vancomycin':'?', 'amiodarone|piperacillin':'n',
+    'amiodarone|ceftriaxone':'?', 'amiodarone|meropenem':'?',
+    'amiodarone|potassium':'y', 'amiodarone|magnesium':'y',
+    'amiodarone|dexamethasone':'?', 'amiodarone|hydrocortisone':'?',
+    'amiodarone|ranitidine':'y', 'amiodarone|phenytoin':'n',
+    'amiodarone|sodium_bicarb':'n', 'amiodarone|atropine':'?',
+    'amiodarone|cefazolin':'?', 'amiodarone|ceftazidime':'?',
+    'amiodarone|acetaminophen':'?', 'amiodarone|levetiracetam':'?',
+    'amiodarone|dobutamine':'y',
+
+    // ── DOBUTAMINE ──
+    'dobutamine|dopamine':'y', 'dobutamine|fentanyl':'y', 'dobutamine|heparin':'y',
+    'dobutamine|insulin':'?', 'dobutamine|labetalol':'y', 'dobutamine|lasix':'n',
+    'dobutamine|lidocaine':'y', 'dobutamine|midazolam':'y', 'dobutamine|norepinephrine':'y',
+    'dobutamine|octreotide':'?', 'dobutamine|pantoprazole':'n', 'dobutamine|tng':'y',
+    'dobutamine|morphine':'y', 'dobutamine|propofol':'y', 'dobutamine|vancomycin':'y',
+    'dobutamine|piperacillin':'?', 'dobutamine|ceftriaxone':'y', 'dobutamine|meropenem':'?',
+    'dobutamine|potassium':'y', 'dobutamine|magnesium':'y', 'dobutamine|ranitidine':'y',
+    'dobutamine|sodium_bicarb':'n', 'dobutamine|dexamethasone':'y', 'dobutamine|atropine':'y',
+    'dobutamine|cefazolin':'?', 'dobutamine|ceftazidime':'?',
+    'dobutamine|acetaminophen':'y', 'dobutamine|levetiracetam':'y',
+
+    // ── DOPAMINE ──
+    'dopamine|fentanyl':'y', 'dopamine|heparin':'y', 'dopamine|insulin':'y',
+    'dopamine|labetalol':'y', 'dopamine|lasix':'n', 'dopamine|lidocaine':'y',
+    'dopamine|midazolam':'y', 'dopamine|norepinephrine':'y', 'dopamine|octreotide':'?',
+    'dopamine|pantoprazole':'n', 'dopamine|tng':'y', 'dopamine|morphine':'y',
+    'dopamine|propofol':'y', 'dopamine|vancomycin':'y', 'dopamine|piperacillin':'y',
+    'dopamine|ceftriaxone':'y', 'dopamine|meropenem':'y', 'dopamine|potassium':'y',
+    'dopamine|magnesium':'y', 'dopamine|ranitidine':'y', 'dopamine|dexamethasone':'y',
+    'dopamine|hydrocortisone':'y', 'dopamine|sodium_bicarb':'n', 'dopamine|atropine':'y',
+    'dopamine|cefazolin':'y', 'dopamine|ceftazidime':'y',
+    'dopamine|acetaminophen':'y', 'dopamine|levetiracetam':'y',
+
+    // ── FENTANYL ──
+    'fentanyl|heparin':'y', 'fentanyl|insulin':'?', 'fentanyl|labetalol':'y',
+    'fentanyl|lasix':'n', 'fentanyl|lidocaine':'y', 'fentanyl|midazolam':'y',
+    'fentanyl|norepinephrine':'v', // conflicting at high concentration
+    'fentanyl|octreotide':'?', 'fentanyl|pantoprazole':'n', 'fentanyl|tng':'y',
+    'fentanyl|morphine':'y', 'fentanyl|propofol':'y', 'fentanyl|vancomycin':'y',
+    'fentanyl|piperacillin':'y', 'fentanyl|ceftriaxone':'y', 'fentanyl|meropenem':'y',
+    'fentanyl|potassium':'y', 'fentanyl|magnesium':'y', 'fentanyl|ranitidine':'y',
+    'fentanyl|dexamethasone':'y', 'fentanyl|hydrocortisone':'y',
+    'fentanyl|sodium_bicarb':'?', 'fentanyl|atropine':'y',
+    'fentanyl|cefazolin':'y', 'fentanyl|ceftazidime':'y',
+    'fentanyl|acetaminophen':'y', 'fentanyl|levetiracetam':'y',
+
+    // ── HEPARIN ──
+    'heparin|insulin':'y', 'heparin|labetalol':'?', 'heparin|lasix':'y',
+    'heparin|lidocaine':'y', 'heparin|midazolam':'y', 'heparin|norepinephrine':'n',
+    'heparin|octreotide':'y', 'heparin|pantoprazole':'n',
+    'heparin|tng':'v', // conflicting in some formulations
+    'heparin|morphine':'y', 'heparin|propofol':'y', 'heparin|vancomycin':'n',
+    'heparin|piperacillin':'y', 'heparin|ceftriaxone':'y', 'heparin|meropenem':'?',
+    'heparin|potassium':'y', 'heparin|magnesium':'y', 'heparin|ranitidine':'y',
+    'heparin|dexamethasone':'y', 'heparin|hydrocortisone':'y', 'heparin|sodium_bicarb':'y',
+    'heparin|acetaminophen':'y', 'heparin|levetiracetam':'y',
+
+    // ── INSULIN ──
+    'insulin|labetalol':'?', 'insulin|lasix':'?', 'insulin|lidocaine':'?',
+    'insulin|midazolam':'?', 'insulin|norepinephrine':'?', 'insulin|octreotide':'?',
+    'insulin|pantoprazole':'n', 'insulin|tng':'?', 'insulin|morphine':'?',
+    'insulin|propofol':'?', 'insulin|vancomycin':'?', 'insulin|potassium':'y',
+    'insulin|magnesium':'?', 'insulin|ranitidine':'?', 'insulin|sodium_bicarb':'?',
+
+    // ── LABETALOL ──
+    'labetalol|lasix':'?', 'labetalol|lidocaine':'y', 'labetalol|midazolam':'y',
+    'labetalol|norepinephrine':'?', 'labetalol|octreotide':'?', 'labetalol|pantoprazole':'?',
+    'labetalol|tng':'y', 'labetalol|morphine':'y', 'labetalol|propofol':'y',
+    'labetalol|vancomycin':'?', 'labetalol|potassium':'y', 'labetalol|magnesium':'y',
+    'labetalol|ranitidine':'y', 'labetalol|sodium_bicarb':'n',
+    'labetalol|acetaminophen':'y', 'labetalol|levetiracetam':'?',
+
+    // ── LASIX (FUROSEMIDE) ──
+    'lasix|lidocaine':'?', 'lasix|midazolam':'n', 'lasix|norepinephrine':'?',
+    'lasix|octreotide':'?', 'lasix|pantoprazole':'y', 'lasix|tng':'?',
+    'lasix|morphine':'n', 'lasix|propofol':'n',
+    'lasix|vancomycin':'v', // some reports of compatibility, verify locally
+    'lasix|piperacillin':'y', 'lasix|ceftriaxone':'y', 'lasix|meropenem':'y',
+    'lasix|potassium':'y', 'lasix|magnesium':'y', 'lasix|ranitidine':'n',
+    'lasix|dexamethasone':'y', 'lasix|hydrocortisone':'y', 'lasix|sodium_bicarb':'y',
+    'lasix|acetaminophen':'y', 'lasix|levetiracetam':'?',
+
+    // ── LIDOCAINE ──
+    'lidocaine|midazolam':'y', 'lidocaine|norepinephrine':'y', 'lidocaine|octreotide':'?',
+    'lidocaine|pantoprazole':'?', 'lidocaine|tng':'y', 'lidocaine|morphine':'y',
+    'lidocaine|propofol':'y', 'lidocaine|vancomycin':'y', 'lidocaine|potassium':'y',
+    'lidocaine|magnesium':'y', 'lidocaine|ranitidine':'y', 'lidocaine|sodium_bicarb':'n',
+
+    // ── MIDAZOLAM ──
+    'midazolam|norepinephrine':'y', 'midazolam|octreotide':'?', 'midazolam|pantoprazole':'n',
+    'midazolam|tng':'y', 'midazolam|morphine':'y', 'midazolam|propofol':'y',
+    'midazolam|vancomycin':'y', 'midazolam|piperacillin':'?', 'midazolam|ceftriaxone':'y',
+    'midazolam|meropenem':'y', 'midazolam|potassium':'y', 'midazolam|magnesium':'y',
+    'midazolam|ranitidine':'y', 'midazolam|dexamethasone':'y', 'midazolam|sodium_bicarb':'?',
+    'midazolam|acetaminophen':'y', 'midazolam|levetiracetam':'y',
+
+    // ── NOREPINEPHRINE ──
+    'norepinephrine|octreotide':'?', 'norepinephrine|pantoprazole':'n', 'norepinephrine|tng':'y',
+    'norepinephrine|morphine':'y', 'norepinephrine|propofol':'y', 'norepinephrine|vancomycin':'y',
+    'norepinephrine|piperacillin':'?', 'norepinephrine|ceftriaxone':'y', 'norepinephrine|meropenem':'?',
+    'norepinephrine|potassium':'y', 'norepinephrine|magnesium':'y', 'norepinephrine|ranitidine':'y',
+    'norepinephrine|dexamethasone':'y', 'norepinephrine|sodium_bicarb':'n',
+    'norepinephrine|acetaminophen':'y', 'norepinephrine|levetiracetam':'y',
+    'norepinephrine|hydrocortisone':'y',
+
+    // ── OCTREOTIDE ──
+    'octreotide|pantoprazole':'?', 'octreotide|tng':'?', 'octreotide|morphine':'?',
+    'octreotide|propofol':'?', 'octreotide|vancomycin':'?', 'octreotide|potassium':'?',
+
+    // ── PANTOPRAZOLE ──
+    'pantoprazole|tng':'n', 'pantoprazole|morphine':'n', 'pantoprazole|propofol':'n',
+    'pantoprazole|vancomycin':'v', // limited data — verify locally
+    'pantoprazole|piperacillin':'y', 'pantoprazole|ceftriaxone':'n',
+    'pantoprazole|meropenem':'y', 'pantoprazole|potassium':'?', 'pantoprazole|magnesium':'?',
+    'pantoprazole|ranitidine':'n', 'pantoprazole|dexamethasone':'?',
+    'pantoprazole|sodium_bicarb':'n', 'pantoprazole|atropine':'?',
+    'pantoprazole|acetaminophen':'?', 'pantoprazole|levetiracetam':'?',
+    'pantoprazole|cefazolin':'?', 'pantoprazole|ceftazidime':'?',
+
+    // ── TNG (NITROGLYCERIN) ──
+    'tng|morphine':'y', 'tng|propofol':'?', 'tng|vancomycin':'y',
+    'tng|piperacillin':'?', 'tng|ceftriaxone':'?', 'tng|potassium':'y',
+    'tng|magnesium':'y', 'tng|ranitidine':'y', 'tng|dexamethasone':'y',
+    'tng|acetaminophen':'?', 'tng|levetiracetam':'?',
+
+    // ── MORPHINE ──
+    'morphine|propofol':'y', 'morphine|vancomycin':'y', 'morphine|piperacillin':'n',
+    'morphine|ceftriaxone':'n', 'morphine|meropenem':'y', 'morphine|potassium':'y',
+    'morphine|magnesium':'y', 'morphine|ranitidine':'y', 'morphine|dexamethasone':'y',
+    'morphine|hydrocortisone':'y', 'morphine|sodium_bicarb':'?', 'morphine|atropine':'y',
+    'morphine|cefazolin':'y', 'morphine|ceftazidime':'?',
+    'morphine|acetaminophen':'y', 'morphine|levetiracetam':'y',
+
+    // ── PROPOFOL ──
+    'propofol|vancomycin':'n', 'propofol|piperacillin':'y', 'propofol|ceftriaxone':'?',
+    'propofol|meropenem':'y', 'propofol|potassium':'y', 'propofol|magnesium':'y',
+    'propofol|ranitidine':'?', 'propofol|dexamethasone':'y', 'propofol|hydrocortisone':'?',
+    'propofol|acetaminophen':'?', 'propofol|levetiracetam':'?',
+
+    // ── VANCOMYCIN ──
+    'vancomycin|piperacillin':'n', 'vancomycin|ceftriaxone':'n', 'vancomycin|meropenem':'y',
+    'vancomycin|potassium':'y', 'vancomycin|magnesium':'y', 'vancomycin|ranitidine':'y',
+    'vancomycin|dexamethasone':'y', 'vancomycin|hydrocortisone':'y',
+    'vancomycin|sodium_bicarb':'?', 'vancomycin|atropine':'y',
+    'vancomycin|cefazolin':'n', 'vancomycin|ceftazidime':'n',
+    'vancomycin|acetaminophen':'y', 'vancomycin|levetiracetam':'y',
+
+    // ── PIPERACILLIN-TAZOBACTAM ──
+    'piperacillin|ceftriaxone':'n', 'piperacillin|meropenem':'?', 'piperacillin|potassium':'y',
+    'piperacillin|magnesium':'y', 'piperacillin|ranitidine':'y', 'piperacillin|dexamethasone':'y',
+    'piperacillin|hydrocortisone':'y', 'piperacillin|sodium_bicarb':'?', 'piperacillin|atropine':'y',
+    'piperacillin|cefazolin':'n', 'piperacillin|ceftazidime':'?',
+    'piperacillin|acetaminophen':'y', 'piperacillin|levetiracetam':'y',
+
+    // ── CEFTRIAXONE ──
+    'ceftriaxone|meropenem':'?', 'ceftriaxone|potassium':'y', 'ceftriaxone|magnesium':'n',
+    'ceftriaxone|ranitidine':'y', 'ceftriaxone|dexamethasone':'y', 'ceftriaxone|hydrocortisone':'y',
+    'ceftriaxone|sodium_bicarb':'?', 'ceftriaxone|atropine':'y',
+    'ceftriaxone|cefazolin':'?', 'ceftriaxone|ceftazidime':'?',
+    'ceftriaxone|acetaminophen':'y', 'ceftriaxone|levetiracetam':'y',
+
+    // ── MEROPENEM ──
+    'meropenem|potassium':'y', 'meropenem|magnesium':'y', 'meropenem|ranitidine':'y',
+    'meropenem|dexamethasone':'y', 'meropenem|hydrocortisone':'y', 'meropenem|sodium_bicarb':'?',
+    'meropenem|acetaminophen':'y', 'meropenem|levetiracetam':'y',
+
+    // ── POTASSIUM CHLORIDE ──
+    'potassium|magnesium':'y', 'potassium|ranitidine':'y', 'potassium|dexamethasone':'y',
+    'potassium|hydrocortisone':'y', 'potassium|sodium_bicarb':'?', 'potassium|atropine':'y',
+    'potassium|cefazolin':'y', 'potassium|ceftazidime':'y',
+    'potassium|acetaminophen':'y', 'potassium|levetiracetam':'y',
+
+    // ── MAGNESIUM SULFATE ──
+    'magnesium|ranitidine':'y', 'magnesium|dexamethasone':'y', 'magnesium|hydrocortisone':'y',
+    'magnesium|sodium_bicarb':'?', 'magnesium|atropine':'y',
+    'magnesium|cefazolin':'?', 'magnesium|ceftazidime':'?',
+    'magnesium|acetaminophen':'y', 'magnesium|levetiracetam':'y', 'magnesium|ceftriaxone':'n',
+
+    // ── RANITIDINE ──
+    'ranitidine|dexamethasone':'y', 'ranitidine|hydrocortisone':'y', 'ranitidine|sodium_bicarb':'y',
+    'ranitidine|acetaminophen':'y', 'ranitidine|levetiracetam':'y',
+
+    // ── DEXAMETHASONE ──
+    'dexamethasone|hydrocortisone':'?', 'dexamethasone|sodium_bicarb':'?',
+    'dexamethasone|acetaminophen':'y', 'dexamethasone|levetiracetam':'y',
+
+    // ── HYDROCORTISONE ──
+    'hydrocortisone|sodium_bicarb':'?', 'hydrocortisone|atropine':'y',
+    'hydrocortisone|ceftazidime':'?', 'hydrocortisone|acetaminophen':'?',
+    'hydrocortisone|levetiracetam':'?',
+
+    // ── SODIUM BICARBONATE ──
+    'sodium_bicarb|phenytoin':'n', 'sodium_bicarb|cefazolin':'?',
+    'sodium_bicarb|ceftazidime':'?', 'sodium_bicarb|acetaminophen':'?',
+    'sodium_bicarb|levetiracetam':'y',
+
+    // ── ATROPINE ──
+    'atropine|cefazolin':'y', 'atropine|ceftazidime':'y',
+    'atropine|acetaminophen':'y', 'atropine|levetiracetam':'?', 'atropine|phenytoin':'?',
+
+    // ── VASOPRESSIN ──
+
+    // ── EPINEPHRINE ──
+    'epinephrine|ceftazidime':'?', 'epinephrine|acetaminophen':'y',
+    'epinephrine|levetiracetam':'?', 'epinephrine|phenytoin':'n',
+
+    // ── DEXMEDETOMIDINE ──
+
+    // ── CEFAZOLIN ──
+    'cefazolin|ceftazidime':'?', 'cefazolin|acetaminophen':'y', 'cefazolin|levetiracetam':'y',
+    'cefazolin|phenytoin':'n', 'cefazolin|vancomycin':'n',
+
+    // ── CEFTAZIDIME ──
+    'ceftazidime|acetaminophen':'y', 'ceftazidime|levetiracetam':'y',
+    'ceftazidime|phenytoin':'?', 'ceftazidime|vancomycin':'n',
+
+    // ── ACETAMINOPHEN / LEVETIRACETAM / PHENYTOIN ──
+    'acetaminophen|levetiracetam':'y', 'acetaminophen|phenytoin':'?',
+    'levetiracetam|phenytoin':'?',
+
+    // ── CIPROFLOXACIN ──
+    'ciprofloxacin|heparin':'n', 'ciprofloxacin|dopamine':'?', 'ciprofloxacin|dobutamine':'?',
+    'ciprofloxacin|norepinephrine':'?', 'ciprofloxacin|fentanyl':'y', 'ciprofloxacin|midazolam':'y',
+    'ciprofloxacin|morphine':'?', 'ciprofloxacin|propofol':'?', 'ciprofloxacin|vancomycin':'n',
+    'ciprofloxacin|piperacillin':'n', 'ciprofloxacin|ceftriaxone':'n', 'ciprofloxacin|ceftazidime':'n',
+    'ciprofloxacin|cefazolin':'n', 'ciprofloxacin|meropenem':'n', 'ciprofloxacin|potassium':'y',
+    'ciprofloxacin|magnesium':'n', 'ciprofloxacin|ranitidine':'y', 'ciprofloxacin|dexamethasone':'?',
+    'ciprofloxacin|hydrocortisone':'?', 'ciprofloxacin|sodium_bicarb':'n', 'ciprofloxacin|atropine':'?',
+    'ciprofloxacin|acetaminophen':'?', 'ciprofloxacin|levetiracetam':'?', 'ciprofloxacin|phenytoin':'n',
+    'ciprofloxacin|amiodarone':'?', 'ciprofloxacin|lidocaine':'?', 'ciprofloxacin|labetalol':'?',
+    'ciprofloxacin|tng':'?', 'ciprofloxacin|lasix':'?', 'ciprofloxacin|pantoprazole':'?',
+    'ciprofloxacin|insulin':'?', 'ciprofloxacin|octreotide':'?', 'ciprofloxacin|epinephrine':'?',
+};
+
+
+const YSITE_EXTRA_DRUGS = [
+    { id:'morphine',       name:'مورفین',                en:'Morphine' },
+    { id:'propofol',       name:'پروپوفول',              en:'Propofol' },
+    { id:'vancomycin',     name:'وانکومایسین',           en:'Vancomycin' },
+    { id:'piperacillin',   name:'پیپراسیلین-تازوباکتام', en:'Pip-Taz' },
+    { id:'cefazolin',      name:'سفازولین',              en:'Cefazolin' },
+    { id:'ceftazidime',    name:'سفتازیدیم',             en:'Ceftazidime' },
+    { id:'ceftriaxone',    name:'سفتریاکسون',            en:'Ceftriaxone' },
+    { id:'ciprofloxacin',  name:'سیپروفلوکساسین',        en:'Ciprofloxacin' },
+    { id:'meropenem',      name:'مروپنم',                en:'Meropenem' },
+    { id:'potassium',      name:'پتاسیم کلراید',         en:'KCl' },
+    { id:'magnesium',      name:'منیزیم سولفات',         en:'MgSO₄' },
+    { id:'ranitidine',     name:'رانیتیدین',             en:'Ranitidine' },
+    { id:'dexamethasone',  name:'دگزامتازون',            en:'Dexamethasone' },
+    { id:'hydrocortisone', name:'هیدروکورتیزون',         en:'Hydrocortisone' },
+    { id:'acetaminophen',  name:'استامینوفن (آپوتل)',    en:'Acetaminophen IV' },
+    { id:'levetiracetam',  name:'لوتیراستام (کپرا)',     en:'Levetiracetam' },
+    { id:'sodium_bicarb',  name:'بی‌کربنات سدیم',        en:'NaHCO₃' },
+    { id:'atropine',       name:'آتروپین',               en:'Atropine' },
+    { id:'phenytoin',      name:'فنی‌توئین',             en:'Phenytoin' },
+];
+
+
+function ysiteKey(a, b) {
+    return [a, b].sort().join('|');
+}
+
+function ysiteStatus(a, b) {
+    if (a === b) return 'same';
+    return YSITE_MATRIX[ysiteKey(a, b)] || '?';
+}
+
+function setupYSiteChecker() {
+    const grid = document.getElementById('ysiteDrugGrid');
+    const resetBtn = document.getElementById('ysiteResetBtn');
+    if (!grid) return;
+
+    const selected = new Set();
+
+    function addChip(id, persianName, enName, isExtra) {
+        const chip = document.createElement('button');
+        chip.className = 'ysite-drug-chip' + (isExtra ? ' ysite-chip-extra' : '');
+        chip.dataset.id = id;
+        chip.title = enName || '';
+        chip.innerHTML = `<span>${persianName}</span>`;
+        chip.addEventListener('click', () => {
+            if (selected.has(id)) {
+                selected.delete(id);
+                chip.classList.remove('selected');
+            } else {
+                selected.add(id);
+                chip.classList.add('selected');
+            }
+            renderMatrix(selected);
+        });
+        grid.appendChild(chip);
+    }
+
+    // All drugs in one flat list — app drugs first, then reference drugs
+    Object.values(drugDatabase).forEach(drug => {
+        addChip(drug.id, drug.persianName, drug.englishName, false);
+    });
+    if (typeof YSITE_EXTRA_DRUGS !== 'undefined') {
+        YSITE_EXTRA_DRUGS.forEach(d => addChip(d.id, d.name, d.en, false));
+    }
+
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+        selected.clear();
+        grid.querySelectorAll('.ysite-drug-chip').forEach(c => c.classList.remove('selected'));
+        renderMatrix(selected);
+        haptic(20);
+    });
+}
+
+function renderMatrix(selected) {
+    const wrap = document.getElementById('ysiteMatrixWrap');
+    const matrix = document.getElementById('ysiteMatrix');
+    if (!wrap || !matrix) return;
+
+    const ids = Array.from(selected);
+    if (ids.length < 2) {
+        wrap.style.display = 'none';
+        return;
+    }
+
+    wrap.style.display = 'block';
+
+    // Resolve name — app drugs or extra reference drugs
+    const _extraMap = {};
+    if (typeof YSITE_EXTRA_DRUGS !== 'undefined') YSITE_EXTRA_DRUGS.forEach(d => { _extraMap[d.id] = d.name; });
+    const names = ids.map(id => drugDatabase[id]?.persianName || _extraMap[id] || id);
+
+    // Build table
+    let html = '<table class="ysite-table"><thead><tr><th></th>';
+    names.forEach(n => { html += `<th class="ysite-th">${n}</th>`; });
+    html += '</tr></thead><tbody>';
+
+    ids.forEach((rowId, ri) => {
+        html += `<tr><td class="ysite-row-label">${names[ri]}</td>`;
+        ids.forEach((colId, ci) => {
+            if (ri === ci) {
+                html += '<td class="ysite-cell ysite-same">—</td>';
+            } else {
+                const status = ysiteStatus(rowId, colId);
+                const cls = status === 'y' ? 'ysite-ok' : status === 'n' ? 'ysite-no' : status === 'v' ? 'ysite-verify' : 'ysite-unk';
+                const icon = status === 'y' ? '✓' : status === 'n' ? '✕' : status === 'v' ? '!' : '?';
+                html += `<td class="ysite-cell ${cls}" title="${names[ri]} + ${names[ci]}">${icon}</td>`;
+            }
+        });
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    html += `<div class="ysite-legend">
+        <span class="ysite-legend-item ysite-ok">🟢 سازگار</span>
+        <span class="ysite-legend-item ysite-no">🔴 ناسازگار</span>
+        <span class="ysite-legend-item ysite-verify">🟡 محدود / متناقض</span>
+        <span class="ysite-legend-item ysite-unk">⚪ بدون داده</span>
+    </div>`;
+
+    matrix.innerHTML = html;
+    haptic(15);
+
+    // Scroll matrix into view
+    setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+}
+
+// ============================================
+// VENTILATOR TIDAL VOLUME CALCULATOR
+// ============================================
+function setupVentilatorCalc() {
+    const genderBtns = document.querySelectorAll('#ventGenderBtns .method-btn-compact');
+    genderBtns.forEach(btn => btn.addEventListener('click', function() {
+        genderBtns.forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+    }));
+
+    const tabs = document.querySelectorAll('#ventMethodTabs .vent-tab');
+    tabs.forEach(tab => tab.addEventListener('click', function() {
+        tabs.forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        document.querySelectorAll('.vent-input-panel').forEach(p => p.style.display = 'none');
+        const panel = document.getElementById('ventPanel_' + this.dataset.tab);
+        if (panel) panel.style.display = 'block';
+    }));
+}
+
+window.calculateVentTV = function() {
+    const genderBtn = document.querySelector('#ventGenderBtns .method-btn-compact.active');
+    const gender = genderBtn ? genderBtn.dataset.gender : 'male';
+    const activeTab = document.querySelector('#ventMethodTabs .vent-tab.active');
+    const method = activeTab ? activeTab.dataset.tab : 'height';
+    const resultDiv = document.getElementById('ventResult');
+
+    let heightCm = null;
+    let estimationNote = '';
+
+    if (method === 'height') {
+        heightCm = PersianNumbers.parseNumber(document.getElementById('ventHeight')?.value);
+        if (!heightCm || isNaN(heightCm) || heightCm < 100 || heightCm > 230) {
+            showToast('خطا', 'قد را به درستی وارد کنید (100–230 cm)', 'error'); return;
+        }
+    } else if (method === 'ulna') {
+        const ulna = PersianNumbers.parseNumber(document.getElementById('ventUlna')?.value);
+        if (!ulna || isNaN(ulna)) { showToast('خطا', 'طول اولنا را وارد کنید', 'error'); return; }
+        heightCm = gender === 'male' ? (3.294 * ulna + 82.7) : (3.316 * ulna + 81.3);
+        estimationNote = `قد تخمینی از طول اولنا (${ulna} cm): <strong>${heightCm.toFixed(1)} cm</strong>`;
+    }
+
+    const heightInch = heightCm / 2.54;
+    const pbw = gender === 'male'
+        ? 50 + 2.3 * (heightInch - 60)
+        : 45.5 + 2.3 * (heightInch - 60);
+
+    if (pbw < 20) { showToast('خطا', 'قد وارد شده خیلی کوتاه است', 'error'); return; }
+
+    const tv4  = pbw * 4;
+    const tv6  = pbw * 6;
+    const tv7  = pbw * 7;
+    const tv8  = pbw * 8;
+
+    resultDiv.innerHTML = `
+        ${estimationNote ? `<div class="vent-estimation">${estimationNote}</div>` : ''}
+        <div class="vent-pbw-row">
+            <span>وزن پیش‌بینی‌شده <span class="latin-inline">(PBW)</span></span>
+            <strong><span class="latin-inline">${pbw.toFixed(1)} kg</span></strong>
+        </div>
+        <div class="vent-tv-grid">
+            <div class="vent-tv-item">
+                <div class="vent-tv-label"><span class="latin-inline">4 mL/kg</span></div>
+                <div class="vent-tv-value"><span class="latin-inline">${Math.round(tv4)}</span></div>
+                <div class="vent-tv-unit"><span class="latin-inline">mL</span></div>
+                <div class="vent-tv-note">حداقل — <span class="latin-inline">ARDS</span> شدید</div>
+            </div>
+            <div class="vent-tv-item vent-tv-target">
+                <div class="vent-tv-label"><span class="latin-inline">6 mL/kg</span></div>
+                <div class="vent-tv-value"><span class="latin-inline">${Math.round(tv6)}</span></div>
+                <div class="vent-tv-unit"><span class="latin-inline">mL</span></div>
+                <div class="vent-tv-note">🎯 هدف — تهویه حفاظتی</div>
+            </div>
+            <div class="vent-tv-item">
+                <div class="vent-tv-label"><span class="latin-inline">7 mL/kg</span></div>
+                <div class="vent-tv-value"><span class="latin-inline">${Math.round(tv7)}</span></div>
+                <div class="vent-tv-unit"><span class="latin-inline">mL</span></div>
+                <div class="vent-tv-note">مرز بالایی قابل قبول</div>
+            </div>
+            <div class="vent-tv-item vent-tv-warn">
+                <div class="vent-tv-label"><span class="latin-inline">8 mL/kg</span></div>
+                <div class="vent-tv-value"><span class="latin-inline">${Math.round(tv8)}</span></div>
+                <div class="vent-tv-unit"><span class="latin-inline">mL</span></div>
+                <div class="vent-tv-note">⚠️ فقط در موارد استثنا</div>
+            </div>
+        </div>
+        <div class="vent-note"><span class="latin-inline">ARDSNet</span> — فرمول <span class="latin-inline">Devine</span> برای <span class="latin-inline">PBW</span></div>
+    `;
+    resultDiv.style.display = 'block';
+    haptic(40);
+    setTimeout(() => resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+};
+
+// ============================================
+// NUTRITIONAL REQUIREMENTS CALCULATOR
+// ============================================
+window.calculateNutrition = function() {
+    const weight  = PersianNumbers.parseNumber(document.getElementById('nutWeight')?.value);
+    const height  = PersianNumbers.parseNumber(document.getElementById('nutHeight')?.value);
+    const age     = PersianNumbers.parseNumber(document.getElementById('nutAge')?.value);
+    const genderBtn = document.querySelector('#nutGenderBtns .method-btn-compact.active');
+    const gender  = genderBtn ? genderBtn.dataset.gender : 'male';
+    const stress  = parseFloat(document.getElementById('nutStress')?.value || '1.2');
+    const resultDiv = document.getElementById('nutResult');
+
+    if (!weight || isNaN(weight) || weight < 20) { showToast('خطا', 'وزن را وارد کنید', 'error'); return; }
+    if (!height || isNaN(height) || height < 100) { showToast('خطا', 'قد را وارد کنید', 'error'); return; }
+    if (!age    || isNaN(age)    || age < 1)      { showToast('خطا', 'سن را وارد کنید', 'error'); return; }
+
+    let bmr_hb, bmr_ms;
+    if (gender === 'male') {
+        bmr_hb = 66.5 + (13.75 * weight) + (5.003 * height) - (6.75 * age);
+        bmr_ms = 10 * weight + 6.25 * height - 5 * age + 5;
+    } else {
+        bmr_hb = 655.1 + (9.563 * weight) + (1.850 * height) - (4.676 * age);
+        bmr_ms = 10 * weight + 6.25 * height - 5 * age - 161;
+    }
+
+    const activityFactor = 1.05;
+    const tee_ms = Math.round(bmr_ms * activityFactor * stress);
+
+    let proteinMin, proteinMax, proteinNote;
+    if (stress <= 1.1) {
+        proteinMin = 0.8; proteinMax = 1.0;
+        proteinNote = 'نیاز طبیعی';
+    } else if (stress <= 1.3) {
+        proteinMin = 1.2; proteinMax = 1.5;
+        proteinNote = 'ICU / بعد از جراحی';
+    } else if (stress <= 1.6) {
+        proteinMin = 1.5; proteinMax = 2.0;
+        proteinNote = 'سپسیس / تروما';
+    } else {
+        proteinMin = 1.5; proteinMax = 2.5;
+        proteinNote = 'سوختگی / ARDS';
+    }
+
+    const protMinG = Math.round(proteinMin * weight);
+    const protMaxG = Math.round(proteinMax * weight);
+    const protMinKcal = Math.round(protMinG * 4);
+    const protMaxKcal = Math.round(protMaxG * 4);
+
+    const npcMin = tee_ms - protMaxKcal;
+    const enteralRateMin = Math.round(npcMin / 24);
+    const enteralRateMax = Math.round(tee_ms / 24);
+    const fluidFromFeed = Math.round(enteralRateMax * 0.85);
+
+    resultDiv.innerHTML = `
+        <div class="nut-section">
+            <div class="nut-section-title"><i class="fas fa-fire"></i> نیاز کالری</div>
+            <div class="nut-row"><span>BMR — Harris-Benedict</span><strong>${bmr_hb.toFixed(0)} kcal/day</strong></div>
+            <div class="nut-row"><span>BMR — Mifflin-St Jeor</span><strong>${bmr_ms.toFixed(0)} kcal/day</strong></div>
+            <div class="nut-row nut-row-highlight"><span>هدف کالری روزانه (×${stress})</span><strong>${tee_ms} kcal/day</strong></div>
+            <div class="nut-row nut-row-sub"><span>معادل کالری ساعتی</span><strong>${Math.round(tee_ms/24)} kcal/hr</strong></div>
+        </div>
+        <div class="nut-section">
+            <div class="nut-section-title"><i class="fas fa-dna"></i> نیاز پروتئین — ${proteinNote}</div>
+            <div class="nut-row"><span>محدوده پروتئین</span><strong>${proteinMin}–${proteinMax} g/kg/day</strong></div>
+            <div class="nut-row nut-row-highlight"><span>هدف پروتئین روزانه</span><strong>${protMinG}–${protMaxG} g/day</strong></div>
+            <div class="nut-row nut-row-sub"><span>معادل کالری پروتئین</span><strong>${protMinKcal}–${protMaxKcal} kcal/day</strong></div>
+        </div>
+        <div class="nut-section">
+            <div class="nut-section-title"><i class="fas fa-syringe"></i> تغذیه انترال (فرمول ۱ kcal/mL)</div>
+            <div class="nut-row nut-row-highlight"><span>سرعت پیشنهادی</span><strong>${enteralRateMin}–${enteralRateMax} mL/hr</strong></div>
+            <div class="nut-row nut-row-sub"><span>آب آزاد از تغذیه</span><strong>~${fluidFromFeed} mL/day</strong></div>
+        </div>
+        <div class="nut-disclaimer"><i class="fas fa-triangle-exclamation"></i> این محاسبه راهنما است. تغذیه بیماران بحرانی باید با متخصص تغذیه هماهنگ شود.</div>
+    `;
+    resultDiv.style.display = 'block';
+    haptic(40);
+    setTimeout(() => resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+};
+
+(function setupNutritionGender() {
+    document.addEventListener('DOMContentLoaded', () => {
+        const genderBtns = document.querySelectorAll('#nutGenderBtns .method-btn-compact');
+        genderBtns.forEach(btn => btn.addEventListener('click', function() {
+            genderBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+        }));
+    });
+})();
+
+// ============================================
+// VBG / ABG INTERPRETER
+// ============================================
+// ============================================
+// VBG / ABG INTERPRETER — Clinically Accurate Engine
+// Based on standard ICU/EM acid-base diagnostic workflow
+// ============================================
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+function _vbgRange(val, lo, hi) { return val >= lo && val <= hi; }
+function _vbgFmt(n, d) { return isNaN(n) ? '—' : n.toFixed(d); }
+
+// ── Step 1: Primary pH status ────────────────────────────────────────────────
+function vbgStep1(pH) {
+    if (pH < 7.35) return 'acidemia';
+    if (pH > 7.45) return 'alkalemia';
+    return 'normal';
+}
+
+// ── Step 2: Identify abnormal variables ──────────────────────────────────────
+function vbgStep2(pco2, hco3) {
+    return {
+        pco2High: pco2 > 45,
+        pco2Low:  pco2 < 35,
+        hco3High: hco3 > 26,
+        hco3Low:  hco3 < 22,
+    };
+}
+
+// ── Step 3 + 4: Primary disorder + expected compensation ─────────────────────
+function vbgStep3(phStatus, pco2, hco3, v) {
+    // Returns array of disorder objects: { type, label, compensation }
+    const disorders = [];
+
+    if (phStatus === 'acidemia') {
+        // Could be metabolic, respiratory, or both
+        if (v.pco2High) {
+            // Respiratory acidosis present
+            const exp_acute   = 24 + 1   * (pco2 - 40) / 10;
+            const exp_chronic = 24 + 3.5 * (pco2 - 40) / 10;
+            let compNote, isMixed = false;
+            if (hco3 < exp_acute - 2) {
+                compNote = `HCO₃ پایین‌تر از جبران حاد — احتمال آسیدوز متابولیک همزمان`;
+                isMixed = true;
+            } else if (_vbgRange(hco3, exp_acute - 2, exp_acute + 2)) {
+                compNote = `جبران متابولیک مناسب برای آسیدوز تنفسی حاد (HCO₃ انتظاری: ${exp_acute.toFixed(1)})`;
+            } else if (_vbgRange(hco3, exp_acute + 2, exp_chronic + 2)) {
+                compNote = `جبران متابولیک در محدوده مزمن (HCO₃ انتظاری حاد: ${exp_acute.toFixed(1)}, مزمن: ${exp_chronic.toFixed(1)})`;
+            } else if (hco3 > exp_chronic + 2) {
+                compNote = `HCO₃ بالاتر از جبران مزمن — احتمال آلکالوز متابولیک همزمان`;
+                isMixed = true;
+            }
+            disorders.push({ type:'resp_acidosis', label:'آسیدوز تنفسی', compNote, isMixed });
+        }
+        if (v.hco3Low) {
+            // Metabolic acidosis present — apply Winter's formula
+            const exp_pco2 = 1.5 * hco3 + 8;
+            let compNote, isMixed = false;
+            if (_vbgRange(pco2, exp_pco2 - 2, exp_pco2 + 2)) {
+                compNote = `جبران تنفسی مناسب — فرمول Winter (pCO₂ انتظاری: ${exp_pco2.toFixed(1)} mmHg)`;
+            } else if (pco2 > exp_pco2 + 2) {
+                compNote = `pCO₂ بالاتر از انتظار — آسیدوز تنفسی همزمان (pCO₂ انتظاری: ${exp_pco2.toFixed(1)})`;
+                isMixed = true;
+            } else {
+                compNote = `pCO₂ پایین‌تر از انتظار — آلکالوز تنفسی همزمان (pCO₂ انتظاری: ${exp_pco2.toFixed(1)})`;
+                isMixed = true;
+            }
+            disorders.push({ type:'meta_acidosis', label:'آسیدوز متابولیک', compNote, isMixed });
+        }
+        // If pH acidemic but neither pco2 high nor hco3 low — unusual, flag both
+        if (!v.pco2High && !v.hco3Low) {
+            disorders.push({ type:'meta_acidosis', label:'آسیدوز متابولیک', compNote:'HCO₃ در مرز — اطلاعات ناکافی برای جبران', isMixed: false });
+        }
+
+    } else if (phStatus === 'alkalemia') {
+        if (v.pco2Low) {
+            // Respiratory alkalosis
+            const exp_acute   = 24 - 2 * (40 - pco2) / 10;
+            const exp_chronic = 24 - 5 * (40 - pco2) / 10;
+            let compNote, isMixed = false;
+            if (hco3 > exp_acute + 2) {
+                compNote = `HCO₃ بالاتر از جبران حاد — احتمال آلکالوز متابولیک همزمان`;
+                isMixed = true;
+            } else if (_vbgRange(hco3, exp_acute - 2, exp_acute + 2)) {
+                compNote = `جبران متابولیک مناسب برای آلکالوز تنفسی حاد (HCO₃ انتظاری: ${exp_acute.toFixed(1)})`;
+            } else if (_vbgRange(hco3, exp_chronic - 2, exp_acute - 2)) {
+                compNote = `جبران متابولیک در محدوده مزمن (HCO₃ انتظاری حاد: ${exp_acute.toFixed(1)}, مزمن: ${exp_chronic.toFixed(1)})`;
+            } else if (hco3 < exp_chronic - 2) {
+                compNote = `HCO₃ پایین‌تر از جبران مزمن — احتمال آسیدوز متابولیک همزمان`;
+                isMixed = true;
+            }
+            disorders.push({ type:'resp_alkalosis', label:'آلکالوز تنفسی', compNote, isMixed });
+        }
+        if (v.hco3High) {
+            // Metabolic alkalosis — expected pCO2 = 0.7×HCO3 + 21 (±2)
+            const exp_pco2 = 0.7 * hco3 + 21;
+            let compNote, isMixed = false;
+            if (_vbgRange(pco2, exp_pco2 - 2, exp_pco2 + 2)) {
+                compNote = `جبران تنفسی مناسب (pCO₂ انتظاری: ${exp_pco2.toFixed(1)} mmHg)`;
+            } else if (pco2 < exp_pco2 - 2) {
+                compNote = `pCO₂ پایین‌تر از انتظار — آلکالوز تنفسی همزمان (pCO₂ انتظاری: ${exp_pco2.toFixed(1)})`;
+                isMixed = true;
+            } else {
+                compNote = `pCO₂ بالاتر از انتظار — آسیدوز تنفسی همزمان (pCO₂ انتظاری: ${exp_pco2.toFixed(1)})`;
+                isMixed = true;
+            }
+            disorders.push({ type:'meta_alkalosis', label:'آلکالوز متابولیک', compNote, isMixed });
+        }
+        if (!v.pco2Low && !v.hco3High) {
+            disorders.push({ type:'meta_alkalosis', label:'آلکالوز متابولیک', compNote:'HCO₃ در مرز — اطلاعات ناکافی برای جبران', isMixed: false });
+        }
+
+    } else {
+        // Normal pH — look for opposing disorders or true normal
+        // Opposing disorder: e.g. metabolic acidosis + respiratory alkalosis → pH normal
+        if (v.pco2High && v.hco3High) {
+            // Chronic resp acidosis with full metabolic compensation
+            const exp_chronic = 24 + 3.5 * (pco2 - 40) / 10;
+            if (_vbgRange(hco3, exp_chronic - 2, exp_chronic + 2)) {
+                disorders.push({ type:'resp_acidosis_comp', label:'آسیدوز تنفسی مزمن جبران‌شده',
+                    compNote:`جبران متابولیک کامل (HCO₃ انتظاری مزمن: ${exp_chronic.toFixed(1)})`, isMixed: false });
+            } else {
+                disorders.push({ type:'mixed_ra_ma', label:'آسیدوز تنفسی + آلکالوز متابولیک (pH طبیعی)',
+                    compNote:'اختلال مختلط — جبران بیش از حد متابولیک', isMixed: true });
+            }
+        } else if (v.pco2Low && v.hco3Low) {
+            disorders.push({ type:'meta_acidosis_comp', label:'آسیدوز متابولیک جبران‌شده',
+                compNote:'آلکالوز تنفسی جبرانی — pH به محدوده طبیعی رسیده', isMixed: false });
+        } else if (v.hco3Low && v.pco2Low) {
+            disorders.push({ type:'mixed', label:'آسیدوز متابولیک + آلکالوز تنفسی (pH طبیعی)',
+                compNote:'اختلال مختلط با pH طبیعی', isMixed: true });
+        } else if (v.hco3High && v.pco2High) {
+            disorders.push({ type:'mixed', label:'آلکالوز متابولیک + آسیدوز تنفسی (pH طبیعی)',
+                compNote:'اختلال مختلط با pH طبیعی', isMixed: true });
+        } else if (!v.pco2High && !v.pco2Low && !v.hco3High && !v.hco3Low) {
+            disorders.push({ type:'normal', label:'طبیعی', compNote:'هیچ اختلال اسید-باز شناخته‌شده‌ای وجود ندارد', isMixed: false });
+        } else {
+            // Single variable mildly abnormal
+            if (v.hco3Low) disorders.push({ type:'meta_acidosis_partial', label:'آسیدوز متابولیک خفیف', compNote:'HCO₃ در مرز پایین', isMixed: false });
+            if (v.hco3High) disorders.push({ type:'meta_alkalosis_partial', label:'آلکالوز متابولیک خفیف', compNote:'HCO₃ در مرز بالا', isMixed: false });
+            if (v.pco2High) disorders.push({ type:'resp_acidosis_partial', label:'آسیدوز تنفسی خفیف', compNote:'pCO₂ در مرز بالا', isMixed: false });
+            if (v.pco2Low)  disorders.push({ type:'resp_alkalosis_partial', label:'آلکالوز تنفسی خفیف', compNote:'pCO₂ در مرز پایین', isMixed: false });
+        }
+    }
+
+    return disorders;
+}
+
+// ── Anion Gap ─────────────────────────────────────────────────────────────────
+function vbgAnionGap(na, cl, hco3, alb) {
+    if (isNaN(na) || isNaN(cl)) return null;
+    const ag_raw = na - (cl + hco3);
+    const albCorr = (!isNaN(alb) && alb > 0) ? 2.5 * (4.0 - alb) : 0;
+    const ag = ag_raw + albCorr;
+    const high = ag > 12;
+    const low  = ag < 8;
+
+    let causes = '', dd = null;
+    if (high) {
+        causes = 'HAGMA: لاکتیک اسیدوز، کتواسیدوز دیابتی، نارسایی کلیوی، سالیسیلات، متانول، اتیلن گلیکول، ایزونیازید';
+        const delta_ag   = ag - 12;
+        const delta_hco3 = 24 - hco3;
+        if (delta_hco3 > 0) {
+            dd = delta_ag / delta_hco3;
+        }
+    } else if (!high && !low) {
+        causes = 'NAGMA: اسهال، RTA، هیپرکلرمی، تزریق زیاد سالین نرمال';
+    } else if (low) {
+        causes = 'آنیون گپ پایین: هیپوآلبومینمی، گاموپاتی، هیپرکلسمی/هیپرمنیزیمی شدید';
+    }
+
+    let ddNote = '';
+    if (dd !== null) {
+        if (dd < 0.8)      ddNote = `Delta ratio ${dd.toFixed(2)} (<0.8): HAGMA + آسیدوز متابولیک طبیعی‌گپ همزمان`;
+        else if (dd <= 2)  ddNote = `Delta ratio ${dd.toFixed(2)} (0.8–2): HAGMA خالص`;
+        else               ddNote = `Delta ratio ${dd.toFixed(2)} (>2): HAGMA + آلکالوز متابولیک مخفی یا آسیدوز تنفسی مزمن`;
+    }
+
+    return { ag, ag_raw, albCorr, high, low, causes, dd, ddNote, albCorrected: albCorr !== 0 };
+}
+
+// ── Severity ──────────────────────────────────────────────────────────────────
+function vbgSeverity(pH, pco2, hco3) {
+    const crits = [];
+    if (pH < 7.20)   crits.push('pH بحرانی < 7.20 — اسیدمی شدید، مداخله فوری');
+    if (pH > 7.60)   crits.push('pH بحرانی > 7.60 — آلکالمی شدید، مداخله فوری');
+    if (pco2 > 70)   crits.push('هیپرکاپنی شدید (pCO₂ > 70) — احتمال نارسایی تنفسی');
+    if (pco2 < 20)   crits.push('هیپوکاپنی شدید (pCO₂ < 20) — هیپرونتیلاسیون بحرانی');
+    if (hco3 < 10)   crits.push('بی‌کربنات بسیار پایین (< 10) — ذخیره بافری ناکافی');
+    if (hco3 > 40)   crits.push('بی‌کربنات بسیار بالا (> 40) — آلکالوز متابولیک شدید');
+
+    const warns = [];
+    if (!crits.length) {
+        if (pH < 7.30)   warns.push('اسیدمی متوسط (pH 7.20–7.30)');
+        if (pH > 7.55)   warns.push('آلکالمی متوسط (pH 7.55–7.60)');
+        if (pco2 > 55)   warns.push('هیپرکاپنی متوسط (pCO₂ > 55)');
+        if (hco3 < 15)   warns.push('بی‌کربنات پایین (15–10)');
+    }
+
+    if (crits.length) return { level: 'critical', items: crits };
+    if (warns.length) return { level: 'moderate', items: warns };
+    return { level: 'mild', items: [] };
+}
+
+// ── Clinical causes per disorder ──────────────────────────────────────────────
+function vbgClinicalHints(disorders, agResult) {
+    const hints = {};
+    const types = disorders.map(d => d.type);
+
+    if (types.includes('meta_acidosis') || types.includes('meta_acidosis_comp')) {
+        if (agResult?.high) {
+            hints['HAGMA'] = {
+                title: 'آسیدوز متابولیک با آنیون گپ بالا',
+                causes: ['لاکتیک اسیدوز (سپسیس، شوک، ایسکمی)', 'کتواسیدوز دیابتی (DKA)', 'نارسایی کلیوی', 'سالیسیلات', 'متانول یا اتیلن گلیکول'],
+                tests: ['لاکتات', 'قند خون + کتون', 'کراتینین و BUN', 'اسمولالیتی + اسمولار گپ', 'سطح سالیسیلات'],
+            };
+        } else {
+            hints['NAGMA'] = {
+                title: 'آسیدوز متابولیک با آنیون گپ طبیعی',
+                causes: ['اسهال یا از دست دادن HCO₃', 'RTA (رنال توبولار اسیدوز)', 'تزریق زیاد سالین نرمال', 'هیپرکلرمی', 'فیستول بیلی-پانکراتیک'],
+                tests: ['الکترولیت کامل', 'کلسیم و فسفر', 'pH ادرار', 'آنیون گپ ادراری'],
+            };
+        }
+    }
+    if (types.some(t => t.includes('resp_acidosis'))) {
+        hints['ResAcid'] = {
+            title: 'آسیدوز تنفسی',
+            causes: ['COPD تشدیدیافته', 'هیپوونتیلاسیون', 'ضعف عصبی-عضلانی (GBS، MG)', 'انسداد راه هوایی', 'اوردوز مواد مخدر'],
+            tests: ['CXR', 'Peak flow / spirometry', 'سطح داروها (اپیوئیدها)'],
+        };
+    }
+    if (types.some(t => t.includes('resp_alkalosis'))) {
+        hints['ResAlk'] = {
+            title: 'آلکالوز تنفسی',
+            causes: ['اضطراب / هیپرونتیلاسیون', 'درد حاد', 'سپسیس (اولیه)', 'آمبولی ریوی', 'هیپوکسمی'],
+            tests: ['SpO₂ / CXR', 'D-dimer / CT-PA در صورت شک به PE'],
+        };
+    }
+    if (types.some(t => t.includes('meta_alkalosis'))) {
+        hints['MetAlk'] = {
+            title: 'آلکالوز متابولیک',
+            causes: ['استفراغ یا NG suction', 'دیورتیک‌های تیازیدی/لوپ', 'هیپوکالمی', 'هیپرآلدوسترونیسم'],
+            tests: ['الکترولیت کامل (K⁺، Cl⁻)', 'Cl⁻ ادراری', 'رنین/آلدوسترون در موارد مزمن'],
+        };
+    }
+    return hints;
+}
+
+// ── Build HTML ────────────────────────────────────────────────────────────────
+function vbgBuildHTML(pH, pco2, hco3, be, disorders, agResult, severity, hints, isVBG) {
+    const phClass = pH < 7.35 ? 'vbg-red' : pH > 7.45 ? 'vbg-blue' : 'vbg-green';
+    const co2Class = pco2 > 45 ? 'vbg-red' : pco2 < 35 ? 'vbg-blue' : '';
+    const hco3Class = hco3 < 22 ? 'vbg-red' : hco3 > 26 ? 'vbg-blue' : '';
+    const beClass = !isNaN(be) ? (be < -2 ? 'vbg-red' : be > 2 ? 'vbg-blue' : '') : '';
+
+    // Primary banner
+    const isMixedAny = disorders.some(d => d.isMixed) || disorders.length > 1;
+    const bannerClass = disorders[0]?.type === 'normal' ? 'vbg-normal'
+        : isMixedAny ? 'vbg-mixed'
+        : disorders[0]?.type.includes('acidosis') ? 'vbg-acidosis'
+        : disorders[0]?.type.includes('alkalosis') ? 'vbg-alkalosis'
+        : 'vbg-normal';
+
+    const primaryTitle = disorders.map(d => d.label).join(' + ') || '—';
+
+    const sevBadge = severity.level === 'critical'
+        ? '<span class="vbg-badge vbg-badge-sev">⚠️ بحرانی</span>'
+        : severity.level === 'moderate'
+            ? '<span class="vbg-badge vbg-badge-mod">متوسط</span>'
+            : '<span class="vbg-badge vbg-badge-ok">خفیف / طبیعی</span>';
+
+    // Compensation rows
+    const compRows = disorders
+        .filter(d => d.compNote)
+        .map(d => `<div class="vbg-comp-text">${isMixedAny && disorders.length > 1 ? `<strong>${d.label}:</strong> ` : ''}${d.compNote}</div>`)
+        .join('');
+
+    // Anion gap section
+    let agHTML = '';
+    if (agResult) {
+        const agClass = agResult.high ? 'vbg-warn' : '';
+        agHTML = `<div class="vbg-section ${agClass}">
+            <div class="vbg-section-title"><i class="fas fa-calculator"></i> آنیون گپ</div>
+            <div class="vbg-row"><span>AG خام</span><strong>${agResult.ag_raw.toFixed(1)} mEq/L</strong></div>
+            ${agResult.albCorrected ? `<div class="vbg-row"><span>AG تصحیح آلبومین</span><strong>${agResult.ag.toFixed(1)} mEq/L</strong></div>` : ''}
+            <div class="vbg-row"><span>تفسیر</span><strong class="${agResult.high ? 'vbg-red' : agResult.low ? 'vbg-blue' : 'vbg-green'}">${agResult.high ? 'بالا (HAGMA)' : agResult.low ? 'پایین' : 'طبیعی'}</strong></div>
+            ${agResult.causes ? `<div class="vbg-causes">${agResult.causes}</div>` : ''}
+            ${agResult.ddNote ? `<div class="vbg-dd"><i class="fas fa-divide"></i> ${agResult.ddNote}</div>` : ''}
+        </div>`;
+    }
+
+    // Severity section
+    let sevHTML = '';
+    if (severity.items.length) {
+        sevHTML = `<div class="vbg-section ${severity.level === 'critical' ? 'vbg-warn' : ''}">
+            <div class="vbg-section-title"><i class="fas fa-triangle-exclamation"></i> ${severity.level === 'critical' ? 'هشدار بحرانی' : 'هشدار'}</div>
+            ${severity.items.map(s => `<div class="vbg-comp-text">⚠️ ${s}</div>`).join('')}
+        </div>`;
+    }
+
+    // Clinical hints
+    let hintsHTML = '';
+    if (Object.keys(hints).length) {
+        hintsHTML = Object.values(hints).map(h => `
+            <div class="vbg-section">
+                <div class="vbg-section-title"><i class="fas fa-stethoscope"></i> ${h.title}</div>
+                <div class="vbg-causes"><strong>علل:</strong> ${h.causes.join('، ')}</div>
+                <div class="vbg-causes"><strong>بررسی‌های پیشنهادی:</strong> ${h.tests.join('، ')}</div>
+            </div>`).join('');
+    }
+
+    // VBG disclaimer
+    const vbgNote = isVBG ? `<div class="vbg-section">
+        <div class="vbg-section-title"><i class="fas fa-info-circle"></i> نکته VBG</div>
+        <div class="vbg-comp-text">مقادیر وریدی (VBG) تقریباً ۰.۰۳–۰.۰۵ واحد کمتر از pH شریانی هستند. pCO₂ وریدی معمولاً ۶–۸ mmHg بالاتر است. HCO₃ وریدی معادل شریانی است. برای ارزیابی دقیق اکسیژناسیون از ABG استفاده کنید.</div>
+    </div>` : '';
+
+    return `
+        <div class="vbg-primary ${bannerClass}">
+            <div class="vbg-primary-label">${primaryTitle}</div>
+            <div class="vbg-primary-severity">${sevBadge}</div>
+        </div>
+
+        <div class="vbg-section">
+            <div class="vbg-section-title"><i class="fas fa-flask"></i> مقادیر</div>
+            <div class="vbg-row"><span>pH</span><strong class="${phClass}">${_vbgFmt(pH,2)}</strong></div>
+            <div class="vbg-row"><span>pCO₂</span><strong class="${co2Class}">${_vbgFmt(pco2,1)} mmHg</strong></div>
+            <div class="vbg-row"><span>HCO₃⁻</span><strong class="${hco3Class}">${_vbgFmt(hco3,1)} mEq/L</strong></div>
+            ${!isNaN(be) ? `<div class="vbg-row"><span>Base Excess</span><strong class="${beClass}">${be >= 0 ? '+' : ''}${_vbgFmt(be,1)}</strong></div>` : ''}
+        </div>
+
+        ${compRows ? `<div class="vbg-section">
+            <div class="vbg-section-title"><i class="fas fa-arrows-left-right"></i> تحلیل جبران</div>
+            ${compRows}
+        </div>` : ''}
+
+        ${agHTML}
+        ${sevHTML}
+        ${hintsHTML}
+        ${vbgNote}
+
+        <div class="vbg-disclaimer"><i class="fas fa-user-doctor"></i> این تفسیر ابزار کمکی آموزشی است — تصمیم بالینی نهایی با پزشک است.</div>
+    `;
+}
+
+// ── Main entry point ──────────────────────────────────────────────────────────
+window.interpretVBG = function() {
+    const pH   = PersianNumbers.parseNumber(document.getElementById('vbgPH')?.value);
+    const pco2 = PersianNumbers.parseNumber(document.getElementById('vbgPCO2')?.value);
+    const hco3 = PersianNumbers.parseNumber(document.getElementById('vbgHCO3')?.value);
+    const beRaw = document.getElementById('vbgBE')?.value || '';
+    const be   = beRaw !== '' ? PersianNumbers.parseNumber(beRaw) : NaN;
+    const na   = PersianNumbers.parseNumber(document.getElementById('vbgNa')?.value);
+    const cl   = PersianNumbers.parseNumber(document.getElementById('vbgCl')?.value);
+    const alb  = PersianNumbers.parseNumber(document.getElementById('vbgAlbumin')?.value);
+    const resultEl = document.getElementById('vbgResult');
+    // Detect mode from checkbox if present, else assume VBG
+    const isVBG = !document.getElementById('vbgModeABG')?.checked;
+
+    if (isNaN(pH)   || pH < 6.5  || pH > 8.0)  { showToast('خطا','pH را بین 6.5 و 8.0 وارد کنید','error'); return; }
+    if (isNaN(pco2) || pco2 < 5  || pco2 > 150) { showToast('خطا','pCO₂ را وارد کنید','error'); return; }
+    if (isNaN(hco3) || hco3 < 1  || hco3 > 60)  { showToast('خطا','HCO₃ را وارد کنید','error'); return; }
+
+    const phStatus  = vbgStep1(pH);
+    const vars      = vbgStep2(pco2, hco3);
+    const disorders = vbgStep3(phStatus, pco2, hco3, vars);
+    const agResult  = vbgAnionGap(na, cl, hco3, alb);
+    const severity  = vbgSeverity(pH, pco2, hco3);
+    const hints     = vbgClinicalHints(disorders, agResult);
+
+    resultEl.innerHTML = vbgBuildHTML(pH, pco2, hco3, be, disorders, agResult, severity, hints, isVBG);
+    resultEl.style.display = 'block';
+    haptic(40);
+    setTimeout(() => resultEl.scrollIntoView({ behavior:'smooth', block:'nearest' }), 100);
+};
