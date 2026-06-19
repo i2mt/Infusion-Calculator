@@ -9579,8 +9579,9 @@ input[style*="display:none"] {
     flex-shrink: 0;
     color: var(--text-tertiary);
 }
+
 /* ============================================
-   VOICE ASSISTANT – GLASSMORPHIC REDESIGN
+   VOICE ASSISTANT – GLASSMORPHIC REDESIGN (FIXED)
    ============================================ */
 
 .voice-container {
@@ -9644,8 +9645,8 @@ input[style*="display:none"] {
 }
 .voice-ring-container {
     position: relative;
-    width: 160px;
-    height: 160px;
+    width: 160px !important;
+    height: 160px !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -9662,28 +9663,28 @@ input[style*="display:none"] {
     transition: all 0.3s;
 }
 .voice-ring.ring-1 {
-    width: 180px;
-    height: 180px;
+    width: 180px !important;
+    height: 180px !important;
     opacity: 0.05;
 }
 .voice-ring.ring-2 {
-    width: 160px;
-    height: 160px;
+    width: 160px !important;
+    height: 160px !important;
     opacity: 0.10;
 }
 .voice-ring.ring-3 {
-    width: 140px;
-    height: 140px;
+    width: 140px !important;
+    height: 140px !important;
     opacity: 0.20;
 }
 .voice-mic-btn {
-    width: 88px;
-    height: 88px;
+    width: 88px !important;
+    height: 88px !important;
     border-radius: 50%;
     border: none;
     background: var(--gradient-primary);
     color: white;
-    font-size: 40px;
+    font-size: 40px !important;
     cursor: pointer;
     z-index: 2;
     box-shadow: 0 8px 40px rgba(102, 126, 234, 0.5);
@@ -9981,14 +9982,14 @@ input[style*="display:none"] {
     color: var(--text-tertiary);
     opacity: 0.8;
 }
-#voiceTextSend {
-    width: 50px;
-    height: 50px;
+.voice-text-send {
+    width: 50px !important;
+    height: 50px !important;
     border-radius: 50%;
     border: none;
     background: var(--gradient-primary);
     color: white;
-    font-size: 22px;
+    font-size: 22px !important;
     cursor: pointer;
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
                 box-shadow 0.2s;
@@ -9998,10 +9999,10 @@ input[style*="display:none"] {
     flex-shrink: 0;
     box-shadow: 0 4px 16px rgba(102, 126, 234, 0.35);
 }
-#voiceTextSend:hover {
+.voice-text-send:hover {
     transform: scale(1.06);
 }
-#voiceTextSend:active {
+.voice-text-send:active {
     transform: scale(0.92);
 }
 .voice-text-hint {
@@ -10061,11 +10062,11 @@ input[style*="display:none"] {
     .voice-container { padding: 16px 12px 24px; }
     .voice-title { font-size: 26px; }
     .voice-title .voice-icon { font-size: 30px; }
-    .voice-ring-container { width: 130px; height: 130px; }
-    .voice-ring.ring-1 { width: 150px; height: 150px; }
-    .voice-ring.ring-2 { width: 130px; height: 130px; }
-    .voice-ring.ring-3 { width: 110px; height: 110px; }
-    .voice-mic-btn { width: 74px; height: 74px; font-size: 34px; }
+    .voice-ring-container { width: 130px !important; height: 130px !important; }
+    .voice-ring.ring-1 { width: 150px !important; height: 150px !important; }
+    .voice-ring.ring-2 { width: 130px !important; height: 130px !important; }
+    .voice-ring.ring-3 { width: 110px !important; height: 110px !important; }
+    .voice-mic-btn { width: 74px !important; height: 74px !important; font-size: 34px !important; }
     .voice-transcript { font-size: 17px; }
     .voice-waveform span { width: 5px; }
     .voice-waveform span:nth-child(2) { height: 24px; }
@@ -10080,6 +10081,6 @@ input[style*="display:none"] {
     .voice-waveform span:nth-child(11) { height: 44px; }
     .voice-waveform span:nth-child(12) { height: 38px; }
     .voice-text-fallback input { font-size: 14px; padding: 10px 14px; }
-    .voice-text-send { width: 44px; height: 44px; font-size: 18px; }
+    .voice-text-send { width: 44px !important; height: 44px !important; font-size: 18px !important; }
     .example-chip { padding: 8px 16px; font-size: 12px; }
 }
