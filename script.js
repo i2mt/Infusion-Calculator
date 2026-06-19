@@ -2247,16 +2247,18 @@ function setupVoiceTab() {
 
 // Override the global startVoice with enhanced version that includes ring/waveform
 const originalStartVoice = window.startVoice || function() {};
-window.startVoice = function() {
+window.startVoice = async function() {
     if (voiceActive) return;
+
+    // Request microphone permission (required for iOS)
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch(e) {
-        showToast('خطا', 'دسترسی به میکروفون داده نشد', 'error');
-        return;
+        try {
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+            showToast('خطا', 'دسترسی به میکروفون داده نشد', 'error');
+            return;
+        }
     }
-}
     // Lazy init recognition (same as original)
     if (!recognition) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
