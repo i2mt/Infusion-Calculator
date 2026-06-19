@@ -732,7 +732,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     loadDrugGrid();
     selectDrug('heparin');
-    initCompatibilityDropdowns();
     loadDrugLibrary();
     initVoiceTab();
 });
@@ -1814,7 +1813,33 @@ function openAccordionById(itemId) {
     haptic(20);
     setTimeout(() => item.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
 }
-
+// ============================================
+// HELPER: Open accordion containing a tool result
+// ============================================
+function openAccordionForTool(resultElementId, fallbackItemId) {
+    const resultEl = document.getElementById(resultElementId);
+    if (resultEl) {
+        const item = resultEl.closest('.accordion-item');
+        if (item) {
+            const body = item.querySelector('.accordion-body');
+            if (body && body.id) {
+                toggleAccordionById(body.id);
+                return true;
+            }
+        }
+    }
+    if (fallbackItemId) {
+        const item = document.getElementById(fallbackItemId);
+        if (item && item.classList.contains('accordion-item')) {
+            const body = item.querySelector('.accordion-body');
+            if (body && body.id) {
+                toggleAccordionById(body.id);
+                return true;
+            }
+        }
+    }
+    return false;
+}
 // ============================================
 // INITIALISE VOICE TAB (Lazy)
 // ============================================
@@ -2239,85 +2264,158 @@ function extractParams(text) {
 
 // --- Command scoring (with settings and all tools) ---
 const COMMAND_KEYWORDS = {
-    drug: {
-        triggers: ['دارو', 'دوز', 'انفوزیون', 'تزریق', 'پمپ', 'سرنگ', 'میکروگرم', 'میلی‌گرم', 'واحد', 'kg', 'kg/h', 'mcg', 'mg', 'units', 'میلی‌لیتر', 'سی‌سی', 'حجم', 'محلول', 'آمپول', 'ویال'],
-        scoreWeight: 1.0
+    // ── Navigation ────────────────────────────────────────────────
+    tab_calculator: {
+        triggers: ['ماشین حساب', 'محاسبه‌گر', 'تب محاسبه', 'برگه محاسبه', 'بخش محاسبه', 'calculator tab', 'go to calculator', 'ماشین‌حساب'],
+        scoreWeight: 0.7
     },
-    druginfo: {
-        triggers: ['اطلاعات', 'درباره', 'توضیح', 'شرح', 'کاربرد', 'مقدار مصرف', 'نحوه مصرف', 'چیه', 'چیست', 'info', 'about', 'describe'],
+    tab_drugs: {
+        triggers: ['مرجع داروها', 'کتابخانه دارو', 'لیست داروها', 'داروخانه', 'drug library', 'drugs tab', 'رفتن به داروها'],
+        scoreWeight: 0.7
+    },
+    tab_tools: {
+        triggers: ['ابزارها', 'تب ابزار', 'ابزارهای بالینی', 'tools tab', 'رفتن به ابزارها', 'ابزارک‌ها'],
+        scoreWeight: 0.7
+    },
+
+    // ── Actions ────────────────────────────────────────────────────
+    clear: {
+        triggers: ['پاک کن', 'پاک کردن', 'صفر', 'clear results', 'reset', 'پاکسازی', 'حذف نتایج'],
+        scoreWeight: 0.8
+    },
+    manual_calc: {
+        triggers: ['محاسبه دستی', 'دستی', 'manual calculation', 'custom calculation', 'محاسبه بدون دارو', 'محاسبه دلخواه'],
         scoreWeight: 0.9
     },
+    history: {
+        triggers: ['تاریخچه', 'محاسبات قبلی', 'سابقه محاسبات', 'تاریخچه محاسبات', 'history', 'گزارش محاسبات'],
+        scoreWeight: 0.9
+    },
+    reverse: {
+        triggers: ['reverse', 'معکوس', 'برعکس', 'وارونه', 'حالت معکوس'],
+        scoreWeight: 0.9
+    },
+
+    // ── Calculators (Tools) ──────────────────────────────────────
     bmi: {
-        triggers: ['bmi', 'بی ام آی', 'b.m.i', 'شاخص توده', 'body mass index'],
+        triggers: ['bmi', 'بی ام آی', 'b.m.i', 'شاخص توده', 'body mass index', 'توده بدنی', 'وزن و قد'],
         scoreWeight: 0.9
     },
     bsa: {
-        triggers: ['bsa', 'بی اس ای', 'b.s.a', 'سطح بدن', 'body surface area', 'mosteller', 'dubois', 'haycock'],
+        triggers: ['bsa', 'بی اس ای', 'b.s.a', 'سطح بدن', 'body surface area', 'mosteller', 'dubois', 'haycock', 'مساحت بدن'],
+        scoreWeight: 0.9
+    },
+    ibw: {
+        triggers: ['وزن ایده‌آل', 'ideal weight', 'ibw', 'وزن ایده‌ال', 'وزن مناسب', 'وزن استاندارد'],
         scoreWeight: 0.9
     },
     crcl: {
-        triggers: ['crcl', 'creatinine clearance', 'کلیرانس کراتینین', 'کراتینین', 'سن', 'weight', 'وزن'],
+        triggers: ['crcl', 'creatinine clearance', 'کلیرانس کراتینین', 'کراتینین', 'کلیرانس', 'clearance', 'نارسایی کلیه'],
         scoreWeight: 0.9
     },
     drip: {
-        triggers: ['drip', 'قطره', 'سرعت قطره', 'gravity', 'ساعت', 'volume', 'حجم', 'زمان', 'ست', 'میکروست', 'ماکروست'],
-        scoreWeight: 0.9
-    },
-    convert: {
-        triggers: ['convert', 'تبدیل', 'mEq', 'meq', 'mg', 'to', 'به', 'میلی‌اکی‌والان'],
+        triggers: ['drip', 'قطره', 'سرعت قطره', 'gravity', 'ساعت', 'حجم', 'زمان', 'ست', 'میکروست', 'ماکروست', 'قطره در دقیقه'],
         scoreWeight: 0.9
     },
     gcs: {
-        triggers: ['gcs', 'گلاسکو', 'glasgow', 'coma', 'کما', 'eye', 'verbal', 'motor', 'چشمی', 'کلامی', 'حرکتی', 'امتیاز'],
+        triggers: ['gcs', 'گلاسکو', 'glasgow', 'coma', 'کما', 'eye', 'verbal', 'motor', 'چشمی', 'کلامی', 'حرکتی', 'امتیاز هوشیاری'],
         scoreWeight: 0.8
     },
     rass: {
-        triggers: ['rass', 'ریچموند', 'richmond', 'agitation', 'sedation', 'آرام‌بخشی', 'آژیتیشن', 'آرام', 'بی‌قرار'],
+        triggers: ['rass', 'ریچموند', 'richmond', 'agitation', 'sedation', 'آرام‌بخشی', 'آژیتیشن', 'آرام', 'بی‌قرار', 'مقیاس آرام‌بخشی'],
         scoreWeight: 0.8
     },
     braden: {
-        triggers: ['braden', 'برادن', 'pressure ulcer', 'زخم فشاری', 'sensory', 'moisture', 'activity', 'mobility', 'nutrition', 'friction', 'حس', 'رطوبت', 'فعالیت', 'تحرک', 'تغذیه', 'اصطکاک'],
+        triggers: ['braden', 'برادن', 'pressure ulcer', 'زخم فشاری', 'sensory', 'moisture', 'activity', 'mobility', 'nutrition', 'friction', 'حس', 'رطوبت', 'فعالیت', 'تحرک', 'تغذیه', 'اصطکاک', 'زخم بستر'],
         scoreWeight: 0.8
     },
     morse: {
-        triggers: ['morse', 'مورس', 'fall', 'سقوط', 'history', 'diagnosis', 'aid', 'gait', 'mental', 'افتادن', 'تشخیص', 'وسیله', 'راه رفتن', 'ذهنی'],
+        triggers: ['morse', 'مورس', 'fall', 'سقوط', 'history', 'diagnosis', 'aid', 'gait', 'mental', 'افتادن', 'تشخیص', 'وسیله', 'راه رفتن', 'ذهنی', 'خطر سقوط'],
         scoreWeight: 0.8
     },
     burns: {
-        triggers: ['burns', 'سوختگی', 'tbsa', 'fire', 'آتش', 'پارکلند', 'parkland', 'قانون نُه', 'rule of nines', 'سطح سوختگی'],
+        triggers: ['burns', 'سوختگی', 'tbsa', 'fire', 'آتش', 'پارکلند', 'parkland', 'قانون نُه', 'rule of nines', 'سطح سوختگی', 'سوختگی پوست'],
         scoreWeight: 0.8
     },
     oxygen: {
-        triggers: ['oxygen', 'اکسیژن', 'کپسول', 'cylinder', 'flow', 'فشار', 'pressure', 'duration', 'مدت', 'جریان'],
+        triggers: ['oxygen', 'اکسیژن', 'کپسول', 'cylinder', 'flow', 'فشار', 'pressure', 'duration', 'مدت', 'جریان', 'اکسیژن درمانی', 'کپسول اکسیژن'],
         scoreWeight: 0.8
     },
     vbg: {
-        triggers: ['vbg', 'abg', 'گاز خون', 'blood gas', 'ph', 'pco2', 'hco3', 'base excess', 'be', 'bicarbonate', 'بی‌کربنات', 'گازهای خون'],
+        triggers: ['vbg', 'abg', 'گاز خون', 'blood gas', 'ph', 'pco2', 'hco3', 'base excess', 'be', 'bicarbonate', 'بی‌کربنات', 'گازهای خون', 'تفسیر گاز خون', 'اسید باز'],
         scoreWeight: 0.8
     },
     ventilator: {
-        triggers: ['ventilator', 'ونتیلاتور', 'tidal volume', 'حجم جاری', 'pbw', 'ARDS', 'lung protective', 'تهویه', 'حجم تنفسی'],
+        triggers: ['ventilator', 'ونتیلاتور', 'tidal volume', 'حجم جاری', 'pbw', 'ARDS', 'lung protective', 'تهویه', 'حجم تنفسی', 'دستگاه تنفس'],
         scoreWeight: 0.8
     },
     nutrition: {
-        triggers: ['nutrition', 'تغذیه', 'کالری', 'calories', 'protein', 'پروتئین', 'bmr', 'harris', 'mifflin', 'استرس', 'stress', 'کالری نیاز'],
+        triggers: ['nutrition', 'تغذیه', 'کالری', 'calories', 'protein', 'پروتئین', 'bmr', 'harris', 'mifflin', 'استرس', 'stress', 'نیاز کالری', 'تغذیه انترال'],
         scoreWeight: 0.8
     },
-    ysite: {
-        triggers: ['ysite', 'y-site', 'سازگاری', 'compatibility', 'تداخل', 'drug interaction', 'دارو', 'mix', 'مخلوط', 'همزمان', 'تزریق همزمان'],
-        scoreWeight: 0.8
-    },
-    reverse: {
-        triggers: ['reverse', 'معکوس', 'برعکس', 'وارونه'],
+
+    // ── Converters ─────────────────────────────────────────────────
+    convert: {
+        triggers: ['convert', 'تبدیل', 'mEq', 'meq', 'mg', 'to', 'به', 'میلی‌اکی‌والان', 'الکترولیت', 'تبدیل واحد'],
         scoreWeight: 0.9
     },
-    help: {
-        triggers: ['help', 'راهنما', 'کمک', 'راهنمایی', 'نمونه', 'example', 'چه کارایی', 'چطور کار کنم'],
-        scoreWeight: 0.6
+    electrolyte: {
+        triggers: ['الکترولیت', 'تبدیل الکترولیت', 'meq به mg', 'mg به meq', 'سدیم', 'پتاسیم', 'کلسیم', 'منیزیم', 'بی‌کربنات', 'electrolyte'],
+        scoreWeight: 0.9
     },
+    percentage: {
+        triggers: ['درصد', 'غلظت درصد', 'percentage solution', 'محلول درصدی', 'درصد دارو'],
+        scoreWeight: 0.9
+    },
+    unit_convert: {
+        triggers: ['تبدیل واحد', 'واحد', 'میکروگرم', 'میلی‌گرم', 'گرم', 'unit conversion', 'مبدل واحد'],
+        scoreWeight: 0.9
+    },
+    temp_convert: {
+        triggers: ['تبدیل دما', 'درجه', 'سلسیوس', 'فارنهایت', 'temperature', 'دمای بدن', 'تب'],
+        scoreWeight: 0.9
+    },
+    weight_convert: {
+        triggers: ['تبدیل وزن', 'کیلوگرم', 'پوند', 'گرم', 'weight conversion', 'وزن به پوند', 'وزن به کیلو'],
+        scoreWeight: 0.9
+    },
+
+    // ── Drug / Compatibility ──────────────────────────────────────
+    drug: {
+        triggers: ['دارو', 'دوز', 'انفوزیون', 'تزریق', 'پمپ', 'سرنگ', 'میکروگرم', 'میلی‌گرم', 'واحد', 'kg/h', 'mcg', 'mg', 'units', 'میلی‌لیتر', 'سی‌سی', 'حجم', 'محلول', 'آمپول', 'ویال', 'دوز دارو'],
+        scoreWeight: 1.0
+    },
+    druginfo: {
+        triggers: ['اطلاعات', 'درباره', 'توضیح', 'شرح', 'کاربرد', 'مقدار مصرف', 'نحوه مصرف', 'چیه', 'چیست', 'info', 'about', 'describe', 'معرفی', 'راهنما دارو'],
+        scoreWeight: 0.9
+    },
+    dose_calc: {
+        triggers: ['محاسبه دوز', 'دوز دارو', 'حجم ویال', 'dose calculation', 'vial', 'حجم تزریقی', 'مقدار مصرف دارو'],
+        scoreWeight: 0.9
+    },
+    compat_tool: {
+        triggers: ['سازگاری دارو', 'compatibility', 'تداخل دارویی', 'داروها', 'drug compatibility', 'سازگاری Y-Site', 'Y-site', 'مخلوط داروها'],
+        scoreWeight: 0.9
+    },
+    ysite: {
+        triggers: ['ysite', 'y-site', 'سازگاری', 'تداخل', 'دارو', 'mix', 'مخلوط', 'همزمان', 'تزریق همزمان', 'Y-Site Compatibility'],
+        scoreWeight: 0.8
+    },
+
+    // ── Theme / Settings ───────────────────────────────────────────
     settings: {
-        triggers: ['dark mode', 'light mode', 'تاریک', 'روشن', 'دارک', 'لایت', 'large font', 'small font', 'فونت بزرگ', 'فونت کوچک', 'تم تاریک', 'تم روشن'],
+        triggers: ['dark mode', 'light mode', 'تاریک', 'روشن', 'دارک', 'لایت', 'large font', 'small font', 'فونت بزرگ', 'فونت کوچک', 'تم تاریک', 'تم روشن', 'تنظیمات', 'settings', 'حالت شب', 'حالت روز'],
         scoreWeight: 0.7
+    },
+    theme: {
+        triggers: ['فاکس', 'fox', 'اقیانوس', 'ocean', 'رز', 'rose', 'جنگل', 'forest', 'پیش‌فرض', 'default', 'تم فاکس', 'تم اقیانوس', 'تم رز', 'تم جنگل', 'theme fox', 'theme ocean', 'theme rose', 'theme forest'],
+        scoreWeight: 0.9
+    },
+
+    // ── Help ──────────────────────────────────────────────────────
+    help: {
+        triggers: ['help', 'راهنما', 'کمک', 'راهنمایی', 'نمونه', 'example', 'چه کارایی', 'چطور کار کنم', 'راهنمای صوتی', 'چه کار کنم'],
+        scoreWeight: 0.6
     }
 };
 
@@ -2357,36 +2455,61 @@ function processVoiceCommand(text) {
     normalized = normalized.replace(/[،،]/g, ' ').replace(/\s+/g, ' ').trim();
     const lower = normalized.toLowerCase();
 
-    // ---- Settings commands (early) ----
-    if (lower.includes('dark mode') || lower.includes('دارک') || lower.includes('تاریک')) {
-        AppState.settings.themeMode = 'dark';
+    // === Theme color commands (fox, ocean, rose, forest, default) ===
+const themeNames = ['fox', 'ocean', 'rose', 'forest', 'default'];
+const persianTheme = { 'fox':'فاکس', 'ocean':'اقیانوس', 'rose':'رز', 'forest':'جنگل', 'default':'پیش‌فرض' };
+for (const theme of themeNames) {
+    if (lower.includes(theme) || lower.includes(persianTheme[theme])) {
+        AppState.settings.colorTheme = theme;
         saveSettings();
-        applyThemeMode();
-        showVoiceResult('حالت تاریک فعال شد', 'success');
+        applyTheme(theme);
+        showVoiceResult(`تم ${theme} فعال شد`, 'success');
         return;
     }
-    if (lower.includes('light mode') || lower.includes('لایت') || lower.includes('روشن')) {
-        AppState.settings.themeMode = 'light';
-        saveSettings();
-        applyThemeMode();
-        showVoiceResult('حالت روشن فعال شد', 'success');
-        return;
-    }
-    if (lower.includes('large font') || lower.includes('فونت بزرگ')) {
-        AppState.settings.largeFont = true;
-        saveSettings();
-        applySettings();
-        showVoiceResult('فونت بزرگ فعال شد', 'success');
-        return;
-    }
-    if (lower.includes('small font') || lower.includes('فونت کوچک')) {
-        AppState.settings.largeFont = false;
-        saveSettings();
-        applySettings();
-        showVoiceResult('فونت معمولی فعال شد', 'success');
-        return;
-    }
+}
 
+// === Dark / Light mode ===
+if (lower.includes('dark mode') || lower.includes('دارک') || lower.includes('تاریک') || lower.includes('حالت شب')) {
+    AppState.settings.themeMode = 'dark';
+    saveSettings();
+    applyThemeMode();
+    showVoiceResult('حالت تاریک فعال شد', 'success');
+    return;
+}
+if (lower.includes('light mode') || lower.includes('لایت') || lower.includes('روشن') || lower.includes('حالت روز')) {
+    AppState.settings.themeMode = 'light';
+    saveSettings();
+    applyThemeMode();
+    showVoiceResult('حالت روشن فعال شد', 'success');
+    return;
+}
+
+// === Font size ===
+if (lower.includes('large font') || lower.includes('فونت بزرگ')) {
+    AppState.settings.largeFont = true;
+    saveSettings();
+    applySettings();
+    showVoiceResult('فونت بزرگ فعال شد', 'success');
+    return;
+}
+if (lower.includes('small font') || lower.includes('فونت کوچک') || lower.includes('فونت معمولی')) {
+    AppState.settings.largeFont = false;
+    saveSettings();
+    applySettings();
+    showVoiceResult('فونت معمولی فعال شد', 'success');
+    return;
+}
+// === Theme color commands ===
+const themeNames = ['fox', 'ocean', 'rose', 'forest', 'default'];
+for (const theme of themeNames) {
+    if (lower.includes(theme + ' theme') || lower.includes('تم ' + theme)) {
+        AppState.settings.colorTheme = theme;
+        saveSettings();
+        applyTheme(theme);
+        showVoiceResult(`تم ${theme} فعال شد`, 'success');
+        return;
+    }
+}
     // ---- Extract params ----
     const params = extractParams(normalized);
 
@@ -2454,6 +2577,14 @@ function executeCommand(cmd, text, params) {
     lastParams = params;
 
     switch (cmd) {
+            case 'history':
+    loadHistory();
+    if (DOM.historyModal) {
+        DOM.historyModal.classList.add('active');
+        document.body.classList.add('no-scroll');
+    }
+    showVoiceResult('تاریخچه محاسبات باز شد', 'success');
+    break;
         case 'help':
             showVoiceResult('دستورات نمونه: "هپارین ۱۲ واحد/کیلوگرم/ساعت وزن ۷۰", "BMI وزن ۷۵ قد ۱۷۵", "قطره ۵۰۰ میلی‌لیتر در ۸ ساعت", "تبدیل ۲۰ mEq سدیم به mg", "GCS 4 5 6", "سوختگی", "اکسیژن ۵ لیتر فشار ۱۵۰ بار جریان ۴", "تغذیه وزن ۷۰ قد ۱۷۵ سن ۵۰", "سازگاری هپارین و وانکومایسین", "تاریک", "فونت بزرگ"', 'info');
             break;
@@ -2512,6 +2643,141 @@ function executeCommand(cmd, text, params) {
             break;
             case 'druginfo':
     handleDrugInfo(text, params);
+    break;
+            case 'tab_calculator':
+    switchTab('calculator');
+    showVoiceResult('بخش ماشین حساب باز شد', 'success');
+    break;
+
+case 'tab_drugs':
+    switchTab('drugs');
+    showVoiceResult('مرجع داروها باز شد', 'success');
+    break;
+
+case 'tab_tools':
+    switchTab('tools');
+    showVoiceResult('ابزارهای بالینی باز شد', 'success');
+    break;
+
+case 'clear':
+    clearResults();
+    showVoiceResult('نتایج پاک شد', 'success');
+    break;
+
+case 'manual_calc':
+    openManualCalculation();
+    showVoiceResult('محاسبه دستی باز شد', 'success');
+    break;
+
+case 'history':
+    loadHistory();
+    if (DOM.historyModal) {
+        DOM.historyModal.classList.add('active');
+        document.body.classList.add('no-scroll');
+    }
+    showVoiceResult('تاریخچه محاسبات باز شد', 'success');
+    break;
+
+case 'ibw':
+    // Switch to tools tab and scroll to IBW
+    switchTab('tools');
+    setTimeout(() => {
+        calculateIBW();
+        openAccordionForTool('ibwResult', 'ibwAccordionItem');
+    }, 300);
+    showVoiceResult('وزن ایده‌آل محاسبه شد', 'success');
+    break;
+
+case 'electrolyte':
+    switchTab('tools');
+    setTimeout(() => {
+        convertElectrolyteLive('meq');
+        openAccordionForTool('electrolyteResult', 'electrolyteAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل الکترولیت انجام شد', 'success');
+    break;
+
+case 'percentage':
+    switchTab('tools');
+    setTimeout(() => {
+        convertPercentageLive();
+        openAccordionForTool('percentageResult', 'percentageAccordionItem');
+    }, 300);
+    showVoiceResult('غلظت درصد محاسبه شد', 'success');
+    break;
+
+case 'unit_convert':
+    switchTab('tools');
+    setTimeout(() => {
+        convertUnitsLive('from');
+        openAccordionForTool('unitResult', 'unitAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل واحد انجام شد', 'success');
+    break;
+
+case 'temp_convert':
+    switchTab('tools');
+    setTimeout(() => {
+        convertTempLive('c');
+        openAccordionForTool('tempResult', 'tempAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل دما انجام شد', 'success');
+    break;
+
+case 'weight_convert':
+    switchTab('tools');
+    setTimeout(() => {
+        convertWeightLive('kg');
+        openAccordionForTool('weightResult', 'weightAccordionItem');
+    }, 300);
+    showVoiceResult('تبدیل وزن انجام شد', 'success');
+    break;
+
+case 'dose_calc':
+    switchTab('tools');
+    setTimeout(() => {
+        // Populate from drug picker if possible, then calculate
+        populateDoseCalcFromDrug();
+        calculateDose();
+        openAccordionForTool('doseResult', 'doseCalcAccordionItem');
+    }, 300);
+    showVoiceResult('محاسبه دوز انجام شد', 'success');
+    break;
+
+case 'compat_tool':
+    switchTab('tools');
+    setTimeout(() => {
+        checkCompatibility();
+        openAccordionForTool('compatResult', 'compatAccordionItem');
+    }, 300);
+    showVoiceResult('بررسی سازگاری انجام شد', 'success');
+    break;
+
+case 'theme':
+    // This should already be caught by the early theme check, but as a fallback:
+    const themeMap = {
+        'fox': 'fox', 'فاکس': 'fox',
+        'ocean': 'ocean', 'اقیانوس': 'ocean',
+        'rose': 'rose', 'رز': 'rose',
+        'forest': 'forest', 'جنگل': 'forest',
+        'default': 'default', 'پیش‌فرض': 'default'
+    };
+    const lowerText = text.toLowerCase();
+    let foundTheme = null;
+    for (const [key, val] of Object.entries(themeMap)) {
+        if (lowerText.includes(key)) {
+            foundTheme = val;
+            break;
+        }
+    }
+    if (foundTheme) {
+        AppState.settings.colorTheme = foundTheme;
+        saveSettings();
+        applyTheme(foundTheme);
+        showVoiceResult(`تم ${foundTheme} فعال شد`, 'success');
+    } else {
+        showVoiceResult('تم شناسایی نشد', 'error');
+    }
     break;
         default:
             showVoiceResult('این دستور هنوز پشتیبانی نمی‌شود.', 'error');
@@ -2652,36 +2918,26 @@ function handleDrugInfo(text, params) {
     // Switch to drugs tab
     switchTab('drugs');
 
-    // Find the accordion item for this drug and open it
-    const drugItem = document.querySelector(`.qref-accordion-item[data-drug-name*="${drug.persianName.toLowerCase()}"]`);
+    // Find the accordion item by drug ID
+    const drugItem = document.querySelector(`.qref-accordion-item[data-drug-id="${drugId}"]`);
     if (drugItem) {
-        if (!drugItem.classList.contains('open')) {
-            const header = drugItem.querySelector('.qref-row');
-            if (header) {
-                const bodyId = header.dataset.bodyId;
-                if (bodyId) {
-                    toggleAccordionById(bodyId);
-                }
-            }
+        const header = drugItem.querySelector('.qref-row');
+        if (header && header.dataset.bodyId) {
+            // Open the accordion using its body ID
+            toggleAccordionById(header.dataset.bodyId);
+            // Scroll to it after a short delay
+            setTimeout(() => {
+                drugItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 400);
+        } else {
+            // Fallback: try to open by clicking the header
+            if (header) header.click();
         }
-        setTimeout(() => {
-            drugItem.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 400);
     } else {
         showToast('اطلاعات دارو', `${drug.persianName} (${drug.englishName}) در بخش مرجع داروها موجود است.`, 'info');
     }
 
     showVoiceResult(`✅ اطلاعات ${drug.persianName} در بخش مرجع داروها باز شد.`, 'success');
-}
-    // Calculate
-    setTimeout(() => {
-        if (AppState.reverseMode) calculateReverse();
-        else calculateInfusion();
-        const drugName = drug.persianName;
-        const doseDisplay = doseVal + ' ' + (drug.weightBased && useWeight ? drug.weightBased.unit : drug.standardUnit);
-        showVoiceResult(`✅ محاسبه ${drugName} با دوز ${doseDisplay} انجام شد.`, 'success');
-        switchTab('calculator');
-    }, 400);
 }
 
 // ---- BMI (with accordion auto-open) ----
@@ -2916,7 +3172,12 @@ function handleOxygenVoice(params) {
     calculateOxygen();
     showVoiceResult('مدت کپسول اکسیژن محاسبه شد', 'success');
     switchTab('tools');
-    setTimeout(() => openAccordionById('oxygenAccordionItem'), 300);
+    setTimeout(() => {
+    if (!openAccordionForTool('oxyResult', 'oxygenAccordionItem')) {
+        // If still not found, try the known ID (maybe it's 'oxygenAccordion')
+        openAccordionById('oxygenAccordion');
+    }
+}, 300);
 }
 
 // ---- VBG ----
@@ -3817,6 +4078,7 @@ function loadDrugLibrary() {
         const item = document.createElement('div');
         item.className = 'accordion-item qref-accordion-item';
         item.style.setProperty('--drug-color', drug.color);
+        item.dataset.drugId = drug.id;
         item.dataset.drugName = drug.persianName.toLowerCase() + ' ' + drug.englishName.toLowerCase();
         item.innerHTML =
             '<div class="qref-row" data-body-id="drug-body-' + drug.id + '">' +
