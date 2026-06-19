@@ -1843,63 +1843,60 @@ function openAccordionForTool(resultElementId, fallbackItemId) {
 // ============================================
 // INITIALISE VOICE TAB (Lazy)
 // ============================================
+// ============================================
+// VOICE ASSISTANT — UI SETUP (Apple‑inspired)
+// ============================================
 function setupVoiceTab() {
+    // --- DOM references (new IDs match the redesigned HTML) ---
     voiceMicBtn = document.getElementById('voiceMicBtn');
     voiceTranscriptEl = document.getElementById('voiceTranscript');
     voiceStatusEl = document.getElementById('voiceStatus');
     voiceResultEl = document.getElementById('voiceResult');
-    if (!voiceMicBtn) return;
+    const voiceWaveform = document.getElementById('voiceWaveform');
+    const ringContainer = document.querySelector('.voice-ring-container');
+    const voiceTextInput = document.getElementById('voiceTextInput');
+    const voiceTextSend = document.getElementById('voiceTextSend');
+    const voiceClearHistoryBtn = document.getElementById('voiceClearHistoryBtn');
+    const voiceHistoryList = document.getElementById('voiceHistoryList');
+    const voiceHistoryWrap = document.getElementById('voiceHistory');
 
-    // SpeechRecognition is created lazily in startVoice()
-    voiceMicBtn.addEventListener('click', () => {
-        if (voiceActive) {
-            stopVoice();
-        } else {
-            startVoice();
-        }
-    });
+    // --- Ensure initial UI states ---
+    if (voiceWaveform) voiceWaveform.classList.remove('active');
+    if (ringContainer) ringContainer.classList.remove('recording');
+    if (voiceStatusEl) voiceStatusEl.textContent = 'برای شروع، دکمه را بزنید';
+    if (voiceTranscriptEl) {
+        voiceTranscriptEl.textContent = '…';
+        voiceTranscriptEl.classList.remove('active');
+    }
+    if (voiceResultEl) {
+        voiceResultEl.style.display = 'none';
+        voiceResultEl.className = 'voice-result';
+        voiceResultEl.innerHTML = '';
+    }
 
-    // --- History ---
-    renderHistory();
-    document.getElementById('voiceClearHistoryBtn')?.addEventListener('click', () => {
-        voiceHistory = [];
-        localStorage.removeItem('voiceHistory');
-        renderHistory();
-    });
+    // --- Mic button: start/stop listening ---
+    if (voiceMicBtn) {
+        // Remove any existing listeners to avoid duplicates
+        const newBtn = voiceMicBtn.cloneNode(true);
+        voiceMicBtn.parentNode.replaceChild(newBtn, voiceMicBtn);
+        voiceMicBtn = newBtn;
 
-    // --- Copy transcript ---
-    document.getElementById('voiceCopyBtn')?.addEventListener('click', () => {
-        const text = voiceTranscriptEl?.textContent || '';
-        if (text) {
-            navigator.clipboard?.writeText(text).then(() => {
-                showToast('کپی شد', 'متن در کلیپ‌بورد کپی شد', 'success');
-            }).catch(() => {});
-        }
-    });
-
-    // --- Text fallback ---
-    const textInput = document.getElementById('voiceTextInput');
-    const textSend = document.getElementById('voiceTextSend');
-    if (textInput && textSend) {
-        textSend.addEventListener('click', () => {
-            const cmd = textInput.value.trim();
-            if (cmd) {
-                processTextInput(cmd);
-                textInput.value = '';
-            }
-        });
-        textInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                textSend.click();
+        voiceMicBtn.addEventListener('click', function() {
+            if (voiceActive) {
+                stopVoice();
+            } else {
+                startVoice();
             }
         });
     }
 
-    // --- Example chips (enhanced) ---
+    // --- Example chips ---
     document.querySelectorAll('.example-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-            const cmd = chip.dataset.command;
+        // Remove old listeners by cloning
+        const newChip = chip.cloneNode(true);
+        chip.parentNode.replaceChild(newChip, chip);
+        newChip.addEventListener('click', function() {
+            const cmd = this.dataset.command;
             if (cmd) {
                 if (voiceTranscriptEl) {
                     voiceTranscriptEl.textContent = cmd;
@@ -1909,14 +1906,75 @@ function setupVoiceTab() {
             }
         });
     });
+
+    // --- Text fallback: send button ---
+    if (voiceTextSend && voiceTextInput) {
+        const newSend = voiceTextSend.cloneNode(true);
+        voiceTextSend.parentNode.replaceChild(newSend, voiceTextSend);
+        newSend.addEventListener('click', function() {
+            const cmd = voiceTextInput.value.trim();
+            if (cmd) {
+                processTextInput(cmd);
+                voiceTextInput.value = '';
+            }
+        });
+        // Also handle Enter key
+        const newInput = voiceTextInput.cloneNode(true);
+        voiceTextInput.parentNode.replaceChild(newInput, voiceTextInput);
+        newInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                newSend.click();
+            }
+        });
+    }
+
+    // --- Clear history ---
+    if (voiceClearHistoryBtn) {
+        const newClear = voiceClearHistoryBtn.cloneNode(true);
+        voiceClearHistoryBtn.parentNode.replaceChild(newClear, voiceClearHistoryBtn);
+        newClear.addEventListener('click', function() {
+            voiceHistory = [];
+            localStorage.removeItem('voiceHistory');
+            renderHistory();
+            showVoiceResult('تاریخچه پاک شد', 'info');
+        });
+    }
+
+    // --- Initial history render ---
+    renderHistory();
+
+    // --- (Optional) Expose the waveform/ring toggling via start/stopVoice ---
+    // We'll patch startVoice and stopVoice to manage these UI elements.
+    // But we need to keep the original functions; we can override them or enhance.
+    // Let's override with enhanced versions that also handle the new UI.
+
+    // Save original functions if needed, but we'll redefine them here.
+    // We'll use the ones defined globally, but we need to add the UI updates.
+    // We'll just extend them; the global functions already exist, but we can
+    // add the ring/waveform updates inside startVoice and stopVoice.
+
+    // However, since startVoice/stopVoice are already defined elsewhere,
+    // we can safely modify them to include the new UI. But to avoid duplication,
+    // we'll overwrite them with enhanced versions that call the original logic.
+    // Actually, the original logic is inside the global functions; we can just
+    // patch them by adding the UI updates. Since they are global, we can
+    // redefine them here or override.
+
+    // To keep it clean, I'll redefine startVoice and stopVoice here.
+    // (They will replace the global ones, which is fine as long as we keep
+    // the same logic plus the UI updates.)
 }
 
 // ============================================
-// VOICE CONTROL
+// ENHANCED startVoice / stopVoice (with new UI)
 // ============================================
-function startVoice() {
+
+// Override the global startVoice with enhanced version that includes ring/waveform
+const originalStartVoice = window.startVoice || function() {};
+window.startVoice = function() {
     if (voiceActive) return;
-    // Lazy init SpeechRecognition
+    // Lazy init recognition (same as original)
     if (!recognition) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
@@ -1930,7 +1988,7 @@ function startVoice() {
         recognition.maxAlternatives = 1;
 
         let finalTranscript = '';
-        recognition.onresult = (event) => {
+        recognition.onresult = function(event) {
             let interim = '';
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const transcript = event.results[i][0].transcript;
@@ -1945,8 +2003,10 @@ function startVoice() {
                 voiceTranscriptEl.textContent = displayText || '...';
                 voiceTranscriptEl.classList.add('active');
             }
-            if (voiceStatusEl) voiceStatusEl.textContent = finalTranscript ? 'در حال پردازش...' : 'گوش می‌کنم...';
-
+            if (voiceStatusEl) {
+                voiceStatusEl.textContent = finalTranscript ? 'در حال پردازش...' : 'گوش می‌کنم...';
+                voiceStatusEl.className = 'voice-status processing';
+            }
             if (event.results[event.results.length - 1].isFinal) {
                 const command = finalTranscript.trim();
                 if (command) {
@@ -1957,26 +2017,35 @@ function startVoice() {
             }
         };
 
-        recognition.onerror = (event) => {
+        recognition.onerror = function(event) {
             console.warn('Voice error:', event.error);
             let msg = 'خطا در تشخیص صدا';
             if (event.error === 'not-allowed') msg = 'دسترسی به میکروفون داده نشد';
             else if (event.error === 'no-speech') msg = 'صدایی تشخیص داده نشد';
             else if (event.error === 'audio-capture') msg = 'میکروفون در دسترس نیست';
-            if (voiceStatusEl) voiceStatusEl.textContent = msg;
+            if (voiceStatusEl) {
+                voiceStatusEl.textContent = msg;
+                voiceStatusEl.className = 'voice-status error';
+            }
             stopVoice();
             showToast('خطا', msg, 'error');
         };
 
-        recognition.onend = () => {
+        recognition.onend = function() {
             // nothing
         };
     }
 
     voiceActive = true;
     voiceMicBtn.classList.add('recording');
-    document.getElementById('voiceIndicator').style.display = 'flex';
-    if (voiceStatusEl) voiceStatusEl.textContent = 'گوش می‌کنم...';
+    const ring = document.querySelector('.voice-ring-container');
+    if (ring) ring.classList.add('recording');
+    const wave = document.getElementById('voiceWaveform');
+    if (wave) wave.classList.add('active');
+    if (voiceStatusEl) {
+        voiceStatusEl.textContent = 'گوش می‌کنم...';
+        voiceStatusEl.className = 'voice-status recording';
+    }
     if (voiceTranscriptEl) {
         voiceTranscriptEl.textContent = '';
         voiceTranscriptEl.classList.remove('active');
@@ -1991,22 +2060,84 @@ function startVoice() {
     } catch (e) {
         console.warn('Voice start error:', e);
         showToast('خطا', 'دسترسی به میکروفون داده نشد یا مشکلی وجود دارد', 'error');
-        stopVoice(); // reset UI
+        stopVoice();
     }
-}
+};
 
-function stopVoice() {
+// Override stopVoice to clean UI
+const originalStopVoice = window.stopVoice || function() {};
+window.stopVoice = function() {
     voiceActive = false;
     voiceMicBtn.classList.remove('recording');
-    document.getElementById('voiceIndicator').style.display = 'none';
+    const ring = document.querySelector('.voice-ring-container');
+    if (ring) ring.classList.remove('recording');
+    const wave = document.getElementById('voiceWaveform');
+    if (wave) wave.classList.remove('active');
     if (voiceStatusEl && !voiceStatusEl.textContent.includes('پردازش')) {
         voiceStatusEl.textContent = 'برای شروع، دکمه را بزنید';
+        voiceStatusEl.className = 'voice-status';
     }
     if (recognition) {
         try { recognition.stop(); } catch (e) {}
     }
-}
+};
 
+// Also update showVoiceResult to use the new result area and status
+const originalShowVoiceResult = window.showVoiceResult || function() {};
+window.showVoiceResult = function(message, type = 'success') {
+    const resultEl = voiceResultEl;
+    if (!resultEl) return;
+    resultEl.style.display = 'block';
+    resultEl.className = 'voice-result' + (type === 'error' ? ' error' : '');
+    // Use innerHTML to allow formatting
+    resultEl.innerHTML = message;
+    if (voiceStatusEl) {
+        voiceStatusEl.textContent = type === 'error' ? 'خطا' : 'انجام شد';
+        voiceStatusEl.className = 'voice-status' + (type === 'error' ? ' error' : ' success');
+    }
+    clearTimeout(voiceTimer);
+    voiceTimer = setTimeout(() => {
+        resultEl.style.display = 'none';
+    }, 12000);
+};
+
+// --- Update renderHistory to use the new history list container ---
+const originalRenderHistory = window.renderHistory || function() {};
+window.renderHistory = function() {
+    const container = document.getElementById('voiceHistoryList');
+    const historyWrap = document.getElementById('voiceHistory');
+    if (!container) return;
+    if (voiceHistory.length === 0) {
+        if (historyWrap) historyWrap.style.display = 'none';
+        return;
+    }
+    if (historyWrap) historyWrap.style.display = 'block';
+    container.innerHTML = voiceHistory.map(cmd =>
+        `<span class="voice-history-chip" data-cmd="${cmd}">${cmd}</span>`
+    ).join('');
+    container.querySelectorAll('.voice-history-chip').forEach(chip => {
+        chip.addEventListener('click', function() {
+            processTextInput(this.dataset.cmd);
+        });
+    });
+};
+
+// --- Also ensure processTextInput uses the new UI ---
+const originalProcessTextInput = window.processTextInput || function() {};
+window.processTextInput = function(text) {
+    if (!text) return;
+    addToHistory(text);
+    if (voiceTranscriptEl) {
+        voiceTranscriptEl.textContent = text;
+        voiceTranscriptEl.classList.add('active');
+    }
+    if (voiceStatusEl) {
+        voiceStatusEl.textContent = 'در حال پردازش...';
+        voiceStatusEl.className = 'voice-status processing';
+    }
+    // Process
+    processVoiceCommand(text);
+};
 // ============================================
 // TEXT INPUT FALLBACK
 // ============================================
