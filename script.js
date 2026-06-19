@@ -2012,14 +2012,13 @@ case 'compat_tool':
     showVoiceResult('بررسی سازگاری انجام شد', 'success');
     break;
 
-case 'theme':
-    const themeMap = {
-        'fox': 'fox', 'فاکس': 'fox',
-        'ocean': 'ocean', 'اقیانوس': 'ocean', 'سایرن': 'ocean',
-        'rose': 'rose', 'رز': 'rose', 'ویکسن': 'rose',
-        'forest': 'forest', 'جنگل': 'forest', 'لینکس': 'forest',
-        'default': 'default', 'پیش‌فرض': 'default', 'هدو': 'default'
-    };
+const themeMap = {
+    'fox': 'fox', 'فاکس': 'fox', 'روباه': 'fox',
+    'ocean': 'ocean', 'اقیانوس': 'ocean', 'سایرن': 'ocean',
+    'rose': 'rose', 'رز': 'rose', 'ویکسن': 'rose',
+    'forest': 'forest', 'جنگل': 'forest', 'لینکس': 'forest',
+    'default': 'default', 'پیش‌فرض': 'default', 'هدو': 'default'
+};
     const lowerText = text.toLowerCase();
     let foundTheme = null;
     for (const [key, val] of Object.entries(themeMap)) {
@@ -2734,7 +2733,7 @@ const COMMAND_KEYWORDS = {
         scoreWeight: 0.7
     },
     theme: {
-    triggers: ['فاکس', 'fox', 'اقیانوس', 'ocean', 'رز', 'rose', 'جنگل', 'forest', 'پیش‌فرض', 'default', 'تم فاکس', 'تم اقیانوس', 'تم رز', 'تم جنگل', 'theme fox', 'theme ocean', 'theme rose', 'theme forest', 'هدو', 'سایرن', 'لینکس', 'ویکسن'],
+    triggers: ['فاکس', 'fox', 'روباه', 'اقیانوس', 'ocean', 'سایرن', 'رز', 'rose', 'ویکسن', 'جنگل', 'forest', 'لینکس', 'پیش‌فرض', 'default', 'تم فاکس', 'تم اقیانوس', 'تم رز', 'تم جنگل', 'theme fox', 'theme ocean', 'theme rose', 'theme forest', 'هدو'],
     scoreWeight: 0.9
 },
 
