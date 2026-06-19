@@ -2443,7 +2443,9 @@ async function startVosk() {
             transcriptEl.textContent = 'در حال دانلود مدل...';
             transcriptEl.classList.add('active');
         }
-
+// Use the global variables or fallback to getElementById
+const statusEl = voiceStatusEl || document.getElementById('voiceStatus');
+const transcriptEl = voiceTranscriptEl || document.getElementById('voiceTranscript');
         // --- Load the model ---
         console.log('⏳ Calling Vosk.createModel()...');
         voskModel = await Vosk.createModel(VOSK_MODEL_URL);
