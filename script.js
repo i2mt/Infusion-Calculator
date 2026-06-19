@@ -2157,7 +2157,9 @@ function setupVoiceTab() {
         voiceMicBtn = newBtn;
 
         voiceMicBtn.addEventListener('click', function() {
+    alert('Mic button clicked!');
     const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    alert('isIOS: ' + isIOS);
 
     if (voiceActive) {
         if (isIOS) {
@@ -2397,6 +2399,7 @@ let voskLoading = false;
 const VOSK_MODEL_URL = 'https://alphacephei.com/vosk/models/vosk-model-small-fa-0.5.zip';
 
 async function startVosk() {
+    alert('startVosk called!');
     console.log('🔵 startVosk() called');
 
     if (voiceActive) {
@@ -3128,22 +3131,26 @@ const params = extractParams(textWithDigits);
         }
     }
 
-    // ---- Disambiguate BMI vs BSA ----
+       // ---- Disambiguate BMI vs BSA ----
     if (lower.includes('سطح بدن') || lower.includes('body surface')) {
+        // Try to extract weight and height directly from text
+        const weightMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:کیلو|kg|کیلوگرم)/i);
+        const heightMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:قد|سانتی|cm)/i);
+        if (weightMatch && heightMatch) {
+            const w = parseFloat(weightMatch[1]);
+            const h = parseFloat(heightMatch[1]);
+            if (w > 0 && h > 0) {
+                executeCommand('bsa', normalized, { weight: w, height: h });
+                return;
+            }
+        }
         if (params.weight && params.height) {
             executeCommand('bsa', normalized, params);
             return;
         }
-    }
-
-    // ---- Check for corrections ----
-    if (lower.includes('no') || lower.includes('نه') || lower.includes('اشتباه')) {
-        if (lastCommand) {
-            showVoiceResult('دستور قبلی لغو شد. لطفاً دوباره بگویید.', 'info');
-            lastCommand = null;
-            lastParams = null;
-            return;
-        }
+        // If only one of them is missing, show a helpful error
+        showVoiceResult('لطفاً وزن و قد را مشخص کنید (مثال: BSA وزن ۷۰ قد ۱۷۰)', 'error');
+        return;
     }
 
     // ---- Score commands ----
