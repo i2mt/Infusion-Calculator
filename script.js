@@ -2394,7 +2394,7 @@ let voskInterval = null;
 let voskModel = null;
 let voskLoading = false;
 
-const VOSK_MODEL_URL = 'https://alphacephei.com/vosk/models/vosk-model-small-fa-0.5.zip';
+const VOSK_MODEL_URL = 'https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip';
 
 async function startVosk() {
     if (voiceActive) return;
