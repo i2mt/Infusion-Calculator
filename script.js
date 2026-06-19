@@ -2399,7 +2399,6 @@ let voskLoading = false;
 const VOSK_MODEL_URL = 'https://alphacephei.com/vosk/models/vosk-model-small-fa-0.5.zip';
 
 async function startVosk() {
-    alert('startVosk called!');
     console.log('🔵 startVosk() called');
 
     if (voiceActive) {
@@ -2419,33 +2418,25 @@ async function startVosk() {
     }
     console.log('✅ Vosk library found');
 
+    // Get DOM elements once (global fallback)
+    const statusEl = voiceStatusEl || document.getElementById('voiceStatus');
+    const transcriptEl = voiceTranscriptEl || document.getElementById('voiceTranscript');
+
     try {
         voskLoading = true;
         console.log('📥 Starting model download from:', VOSK_MODEL_URL);
 
-        // --- Show loading indicator in multiple places ---
-        // 1. Toast
+        // --- Show loading indicator ---
         showToast('در حال بارگذاری', 'دانلود مدل صوتی (۳۰ مگابایت)...', 'info');
-
-        // 2. Status element (if exists)
-        const statusEl = document.getElementById('voiceStatus') || voiceStatusEl;
         if (statusEl) {
             statusEl.textContent = '⏳ دانلود مدل صوتی (۳۰ مگابایت)...';
             statusEl.className = 'voice-status processing';
-            console.log('✅ Status element updated');
-        } else {
-            console.warn('⚠️ voiceStatusEl not found – using fallback');
         }
-
-        // 3. Transcript element (if exists)
-        const transcriptEl = document.getElementById('voiceTranscript') || voiceTranscriptEl;
         if (transcriptEl) {
             transcriptEl.textContent = 'در حال دانلود مدل...';
             transcriptEl.classList.add('active');
         }
-// Use the global variables or fallback to getElementById
-const statusEl = voiceStatusEl || document.getElementById('voiceStatus');
-const transcriptEl = voiceTranscriptEl || document.getElementById('voiceTranscript');
+
         // --- Load the model ---
         console.log('⏳ Calling Vosk.createModel()...');
         voskModel = await Vosk.createModel(VOSK_MODEL_URL);
@@ -2457,7 +2448,6 @@ const transcriptEl = voiceTranscriptEl || document.getElementById('voiceTranscri
         voskLoading = false;
         showToast('آماده', 'مدل صوتی بارگذاری شد.', 'success');
 
-        // --- Update status ---
         if (statusEl) {
             statusEl.textContent = '🎤 در حال دریافت میکروفون...';
             statusEl.className = 'voice-status processing';
@@ -2535,8 +2525,6 @@ const transcriptEl = voiceTranscriptEl || document.getElementById('voiceTranscri
         let msg = 'مشکل در راه‌اندازی Vosk';
         if (e.message) msg += ': ' + e.message;
         showToast('خطا', msg, 'error');
-
-        const statusEl = document.getElementById('voiceStatus') || voiceStatusEl;
         if (statusEl) {
             statusEl.textContent = '❌ خطا: ' + (e.message || 'مشکل نامشخص');
             statusEl.className = 'voice-status error';
@@ -2544,7 +2532,6 @@ const transcriptEl = voiceTranscriptEl || document.getElementById('voiceTranscri
         stopVosk();
     }
 }
-
 function stopVosk() {
     voiceActive = false;
     if (voskInterval) {
