@@ -1937,12 +1937,12 @@ function setupVoiceTab() {
             voiceHistory = [];
             localStorage.removeItem('voiceHistory');
             renderHistory();
-            showVoiceResult('تاریخچه پاک شد', 'info');
+           window.showVoiceResult('تاریخچه پاک شد', 'info');
         });
     }
 
     // --- Initial history render ---
-    renderHistory();
+    window.renderHistory();
 
     // --- (Optional) Expose the waveform/ring toggling via start/stopVoice ---
     // We'll patch startVoice and stopVoice to manage these UI elements.
