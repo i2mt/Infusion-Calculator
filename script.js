@@ -1674,11 +1674,11 @@ function setupVoiceTab() {
 
     // --- History ---
     renderHistory();
-    document.getElementById('clearHistoryBtn')?.addEventListener('click', () => {
-        voiceHistory = [];
-        localStorage.removeItem('voiceHistory');
-        renderHistory();
-    });
+    document.getElementById('voiceClearHistoryBtn')?.addEventListener('click', () => {
+    voiceHistory = [];
+    localStorage.removeItem('voiceHistory');
+    renderHistory();
+});
 
     // --- Copy transcript ---
     document.getElementById('voiceCopyBtn')?.addEventListener('click', () => {
