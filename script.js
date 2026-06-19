@@ -2035,7 +2035,7 @@ case 'theme':
         default:
             showVoiceResult('این دستور هنوز پشتیبانی نمی‌شود.', 'error');
     }
-    // Show tip if available
+      // Show tip if available
     const tip = TIPS[cmd];
     if (tip) {
         setTimeout(() => {
@@ -2045,7 +2045,10 @@ case 'theme':
         }, 1500);
     }
 }
-}
+}   // closes executeCommand
+}   // <-- ADD THIS LINE: closes processVoiceCommand
+// ============================================
+// HANDLER FUNCTIONS
 // ============================================
 // HELPER: Open accordion by ID (for voice redirect)
 // ============================================
