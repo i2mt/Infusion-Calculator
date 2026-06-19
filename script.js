@@ -2876,17 +2876,22 @@ case 'theme':
 // ============================================
 
 // ---- Drug handler ----
+// ---- Drug handler ----
 function handleDrugVoice(text, params) {
+    console.log('🔍 handleDrugVoice called with:', text, params);
+
     const drugId = params.drugId || findDrugName(text);
     if (!drugId) {
         showVoiceResult('دارو شناسایی نشد. لطفاً نام دارو را واضح بگویید.', 'error');
         return;
     }
+    console.log('✅ Drug found:', drugId);
 
+    // Select the drug (populates UI)
     selectDrug(drugId);
     const drug = drugDatabase[drugId];
 
-    // Method
+    // --- Set method ---
     if (params.method) {
         const methodBtns = document.querySelectorAll('.method-btn-compact');
         methodBtns.forEach(btn => {
@@ -2894,7 +2899,7 @@ function handleDrugVoice(text, params) {
         });
     }
 
-    // Volume
+    // --- Set volume ---
     if (params.volume !== undefined) {
         const methodKey = AppState.infusionMethod;
         const volumes = drug.defaultSolutionVolumes[methodKey];
@@ -2915,30 +2920,100 @@ function handleDrugVoice(text, params) {
                 document.querySelectorAll('.volume-preset-btn').forEach(b => b.classList.remove('active'));
             }
         }
-        if (doseVal !== null && doseVal > 0) {
-    // If weight‑based, ensure weight is set
-    const drug = drugDatabase[drugId];
-    if (drug.weightBased && drug.weightBased.active && AppState.useWeight) {
-        const w = parseFloat(DOM.patientWeight?.dataset.numericValue) || 0;
-        if (w <= 0) {
-            showVoiceResult('وزن بیمار را مشخص کنید.', 'error');
-            return;
+    }
+
+    // --- Detect method from volume (if not explicitly set) ---
+    if (params.volume !== undefined) {
+        if (params.volume <= 50) {
+            params.method = 'syringe';
+        } else if (params.volume >= 100) {
+            params.method = 'infusion';
         }
     }
-    // Calculate
-    if (AppState.reverseMode) calculateReverse();
-    else calculateInfusion();
-    showVoiceResult('محاسبه انجام شد.', 'success');
-}
+
+    // --- Set ampoules ---
+    if (params.ampoules) {
+        AppState.ampouleCount = Math.max(1, params.ampoules);
+        updateAmpouleInfo();
+        const ampDisplay = document.getElementById('ampouleCount');
+        if (ampDisplay) ampDisplay.textContent = AppState.ampouleCount;
     }
-// --- Detect infusion method from volume or keywords ---
-if (params.volume !== undefined) {
-    if (params.volume <= 50) {
-        // Small volume -> syringe
-        params.method = 'syringe';
-    } else if (params.volume >= 100) {
-        // Large volume -> infusion
-        params.method = 'infusion';
+
+    // --- Set custom amount ---
+    if (params.customAmount !== undefined && params.customUnit) {
+        const isInsulin = drug.id === 'insulin';
+        if (!isInsulin) {
+            const toggleRow = DOM.customAmountToggleClickRow;
+            if (toggleRow) toggleRow.click();
+        }
+        if (DOM.customAmountInput) {
+            DOM.customAmountInput.value = params.customAmount;
+            DOM.customAmountInput.dataset.numericValue = params.customAmount;
+        }
+    }
+
+    // --- Set weight ---
+    const useWeight = (params.weight !== undefined) || (text.includes('/kg'));
+    if (useWeight && DOM.weightCheckbox && DOM.patientWeight) {
+        DOM.weightCheckbox.checked = true;
+        AppState.useWeight = true;
+        DOM.patientWeight.disabled = false;
+        if (DOM.weightIosToggle) DOM.weightIosToggle.classList.add('on');
+        if (DOM.weightInputRow) DOM.weightInputRow.style.display = 'flex';
+        const w = params.weight || drug.weightBased?.defaultWeight || 70;
+        DOM.patientWeight.value = w;
+        DOM.patientWeight.dataset.numericValue = w;
+        updateWeightBasedUnit(drug);
+    } else {
+        // If weight not mentioned, keep weight off (if drug allows)
+        if (DOM.weightCheckbox) {
+            DOM.weightCheckbox.checked = false;
+            AppState.useWeight = false;
+            if (DOM.weightIosToggle) DOM.weightIosToggle.classList.remove('on');
+            if (DOM.weightInputRow) DOM.weightInputRow.style.display = 'none';
+            if (DOM.patientWeight) DOM.patientWeight.disabled = true;
+        }
+    }
+
+    // --- Set dose ---
+    // Use params.dose first, else extract any number from the phrase
+    let doseVal = params.dose || extractNumberSimple(text);
+    if (doseVal !== null && doseVal > 0) {
+        if (DOM.doctorOrder) {
+            DOM.doctorOrder.value = doseVal;
+            DOM.doctorOrder.dataset.numericValue = doseVal;
+        }
+    } else {
+        showVoiceResult('دوز مشخص نشد. لطفاً مقدار دوز را بگویید.', 'error');
+        return;
+    }
+
+    console.log('📊 Final state:', {
+        drug: drug.persianName,
+        dose: doseVal,
+        useWeight: AppState.useWeight,
+        weight: DOM.patientWeight?.value || 'none',
+        method: AppState.infusionMethod,
+        volume: AppState.solutionVolume,
+        ampoules: AppState.ampouleCount,
+        reverseMode: AppState.reverseMode
+    });
+
+    // --- Calculate ---
+    try {
+        // Ensure the dose range indicator updates
+        updateDoseRangeIndicator();
+
+        // If reverse mode, calculate reverse, else normal
+        if (AppState.reverseMode) {
+            calculateReverse();
+        } else {
+            calculateInfusion();
+        }
+        showVoiceResult(`محاسبه ${drug.persianName} با دوز ${doseVal} انجام شد.`, 'success');
+    } catch (e) {
+        console.error('Calculation error:', e);
+        showVoiceResult('خطا در محاسبه: ' + e.message, 'error');
     }
 }
 // Also if user explicitly said method, it overrides
