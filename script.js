@@ -2252,6 +2252,8 @@ window.startVoice = function() {
 
     // Function to actually start recognition after permission is granted
     function startRecognition() {
+        recognition.continuous = true;   // keep listening until stopVoice() is called
+recognition.interimResults = true;
         if (recognition) {
             // If recognition already exists, just start it
             try {
