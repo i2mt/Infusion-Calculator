@@ -2250,102 +2250,122 @@ const originalStartVoice = window.startVoice || function() {};
 window.startVoice = function() {
     if (voiceActive) return;
 
-    // Lazy init recognition (same as original)
-    if (!recognition) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            showToast('خطا', 'مرورگر شما از تشخیص صدا پشتیبانی نمی‌کند', 'error');
-            return;
-        }
-        recognition = new SpeechRecognition();
-        recognition.lang = 'fa-IR';
-        recognition.continuous = false;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
+    // On iOS, we need to request mic permission via getUserMedia before SpeechRecognition
+    function startRecognition() {
+        // Lazy init recognition (only once)
+        if (!recognition) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                showToast('خطا', 'مرورگر شما از تشخیص صدا پشتیبانی نمی‌کند', 'error');
+                return;
+            }
+            recognition = new SpeechRecognition();
+            recognition.lang = 'fa-IR';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.maxAlternatives = 1;
 
-        recognition.onresult = function(event) {
-            let interim = '';
-            let finalTranscript = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    finalTranscript += transcript;
-                } else {
-                    interim += transcript;
+            recognition.onresult = function(event) {
+                let interim = '';
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interim += transcript;
+                    }
                 }
-            }
-            const displayText = finalTranscript || interim;
-            if (voiceTranscriptEl) {
-                voiceTranscriptEl.textContent = displayText || '...';
-                voiceTranscriptEl.classList.add('active');
-            }
-            if (voiceStatusEl) {
-                voiceStatusEl.textContent = finalTranscript ? 'در حال پردازش...' : 'گوش می‌کنم...';
-                voiceStatusEl.className = 'voice-status processing';
-            }
-            if (event.results[event.results.length - 1].isFinal) {
-                const command = finalTranscript.trim();
-                if (command) {
-                    addToHistory(command);
-                    processVoiceCommand(command);
+                const displayText = finalTranscript || interim;
+                if (voiceTranscriptEl) {
+                    voiceTranscriptEl.textContent = displayText || '...';
+                    voiceTranscriptEl.classList.add('active');
                 }
-                finalTranscript = '';
+                if (voiceStatusEl) {
+                    voiceStatusEl.textContent = finalTranscript ? 'در حال پردازش...' : 'گوش می‌کنم...';
+                    voiceStatusEl.className = 'voice-status processing';
+                }
+                if (event.results[event.results.length - 1].isFinal) {
+                    const command = finalTranscript.trim();
+                    if (command) {
+                        addToHistory(command);
+                        processVoiceCommand(command);
+                    }
+                    finalTranscript = '';
+                    stopVoice();
+                }
+            };
+
+            recognition.onerror = function(event) {
+                console.warn('Voice error:', event.error);
+                let msg = 'خطا در تشخیص صدا';
+                if (event.error === 'not-allowed') {
+                    msg = 'دسترسی به میکروفون داده نشد';
+                    showToast('دسترسی', 'لطفاً در تنظیمات مرورگر، دسترسی میکروفون را فعال کنید.', 'warning');
+                } else if (event.error === 'no-speech') msg = 'صدایی تشخیص داده نشد';
+                else if (event.error === 'audio-capture') msg = 'میکروفون در دسترس نیست';
+                if (voiceStatusEl) {
+                    voiceStatusEl.textContent = msg;
+                    voiceStatusEl.className = 'voice-status error';
+                }
+                stopVoice();
+                showToast('خطا', msg, 'error');
+            };
+
+            recognition.onend = function() {
+                // nothing
+            };
+        }
+
+        voiceActive = true;
+        voiceMicBtn.classList.add('recording');
+        const ring = document.querySelector('.voice-ring-container');
+        if (ring) ring.classList.add('recording');
+        const wave = document.getElementById('voiceWaveform');
+        if (wave) wave.classList.add('active');
+        if (voiceStatusEl) {
+            voiceStatusEl.textContent = 'گوش می‌کنم...';
+            voiceStatusEl.className = 'voice-status recording';
+        }
+        if (voiceTranscriptEl) {
+            voiceTranscriptEl.textContent = '';
+            voiceTranscriptEl.classList.remove('active');
+        }
+        if (voiceResultEl) {
+            voiceResultEl.style.display = 'none';
+            voiceResultEl.className = 'voice-result';
+            voiceResultEl.innerHTML = '';
+        }
+        try {
+            recognition.start();
+        } catch (e) {
+            console.warn('Voice start error:', e);
+            // If already started, ignore
+            if (!e.message || !e.message.includes('already started')) {
+                showToast('خطا', 'دسترسی به میکروفون داده نشد یا مشکلی وجود دارد', 'error');
                 stopVoice();
             }
-        };
-
-        recognition.onerror = function(event) {
-            console.warn('Voice error:', event.error);
-            let msg = 'خطا در تشخیص صدا';
-            if (event.error === 'not-allowed') {
-                msg = 'دسترسی به میکروفون داده نشد';
-                // On iOS, remind user to allow microphone access
-                showToast('دسترسی', 'لطفاً در تنظیمات مرورگر، دسترسی میکروفون را فعال کنید.', 'warning');
-            } else if (event.error === 'no-speech') msg = 'صدایی تشخیص داده نشد';
-            else if (event.error === 'audio-capture') msg = 'میکروفون در دسترس نیست';
-            if (voiceStatusEl) {
-                voiceStatusEl.textContent = msg;
-                voiceStatusEl.className = 'voice-status error';
-            }
-            stopVoice();
-            showToast('خطا', msg, 'error');
-        };
-
-        recognition.onend = function() {
-            // nothing
-        };
-    }
-
-    voiceActive = true;
-    voiceMicBtn.classList.add('recording');
-    const ring = document.querySelector('.voice-ring-container');
-    if (ring) ring.classList.add('recording');
-    const wave = document.getElementById('voiceWaveform');
-    if (wave) wave.classList.add('active');
-    if (voiceStatusEl) {
-        voiceStatusEl.textContent = 'گوش می‌کنم...';
-        voiceStatusEl.className = 'voice-status recording';
-    }
-    if (voiceTranscriptEl) {
-        voiceTranscriptEl.textContent = '';
-        voiceTranscriptEl.classList.remove('active');
-    }
-    if (voiceResultEl) {
-        voiceResultEl.style.display = 'none';
-        voiceResultEl.className = 'voice-result';
-        voiceResultEl.innerHTML = '';
-    }
-    try {
-        recognition.start();
-    } catch (e) {
-        console.warn('Voice start error:', e);
-        // If start fails, try to restart after a short delay (iOS workaround)
-        if (e.message && e.message.includes('already started')) {
-            // ignore
-        } else {
-            showToast('خطا', 'دسترسی به میکروفون داده نشد یا مشکلی وجود دارد', 'error');
-            stopVoice();
         }
+    }
+
+    // Request microphone permission first (required for iOS)
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(function(stream) {
+                // Permission granted – start recognition
+                startRecognition();
+                // Stop the stream to release the mic (recognition will use it)
+                stream.getTracks().forEach(track => track.stop());
+            })
+            .catch(function(err) {
+                console.warn('Microphone permission denied:', err);
+                // Still attempt to start recognition – maybe it works without permission (Android)
+                startRecognition();
+                showToast('توجه', 'برای استفاده از میکروفون، لطفاً دسترسی را در تنظیمات مرورگر فعال کنید.', 'warning');
+            });
+    } else {
+        // No getUserMedia API – just try recognition directly
+        startRecognition();
     }
 };
 
