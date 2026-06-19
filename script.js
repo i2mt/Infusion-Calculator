@@ -3084,15 +3084,10 @@ function handleDrugVoice(text, params) {
         }
     }
 
-   // --- Set dose ---
-// Use params.dose first, else extract any number from the phrase
+       // --- Set dose ---
 let doseVal = params.dose || null;
 if (!doseVal || doseVal <= 0) {
-    // Try to find any number in the text that is not part of a drug name
-    const numberMatch = text.match(/\b(\d+(?:\.\d+)?)\b/);
-    if (numberMatch) {
-        doseVal = parseFloat(numberMatch[1]);
-    }
+    doseVal = extractDoseFromText(text);
 }
 if (doseVal !== null && doseVal > 0) {
     if (DOM.doctorOrder) {
@@ -3534,7 +3529,32 @@ function extractNumberSimple(text) {
     const match = text.match(/(\d+(?:\.\d+)?)/);
     return match ? parseFloat(match[1]) : null;
 }
+function extractDoseFromText(text) {
+    if (!text) return null;
 
+    // 1. Try to find a number with a unit (mg, mcg, g, units)
+    let match = text.match(/(\d+(?:\.\d+)?)\s*(mg|mcg|g|units)/i);
+    if (match) return parseFloat(match[1]);
+
+    // 2. Try to find any bare number
+    match = text.match(/\b(\d+(?:\.\d+)?)\b/);
+    if (match) return parseFloat(match[1]);
+
+    // 3. Try Persian number words
+    const numberWords = {
+        'یک':1, 'دو':2, 'سه':3, 'چهار':4, 'پنج':5,
+        'شش':6, 'هفت':7, 'هشت':8, 'نه':9, 'ده':10,
+        'یازده':11, 'دوازده':12, 'سیزده':13, 'چهارده':14,
+        'پانزده':15, 'شانزده':16, 'هفده':17, 'هجده':18,
+        'نوزده':19, 'بیست':20, 'سی':30, 'چهل':40,
+        'پنجاه':50, 'شصت':60, 'هفتاد':70, 'هشتاد':80,
+        'نود':90, 'صد':100
+    };
+    for (const [word, digit] of Object.entries(numberWords)) {
+        if (text.includes(word)) return digit;
+    }
+    return null;
+}
 // ---- INIT ----
 function initVoiceTab() {
     setupVoiceTab();
