@@ -118,6 +118,10 @@
                 <button class="icon-btn" id="settingsBtn" title="تنظیمات">
                     <i class="fas fa-cog"></i>
                 </button>
+				<div class="voice-indicator" id="voiceIndicator" style="display:none;">
+    <span class="voice-dot"></span>
+    <span class="voice-label">ضبط</span>
+</div>
             </div>
         </div>
     </header>
@@ -1658,7 +1662,10 @@
                 <i class="fas fa-microphone"></i>
             </button>
             <div class="voice-status" id="voiceStatus">برای شروع، دکمه را بزنید</div>
-            <div class="voice-transcript" id="voiceTranscript"></div>
+           <div class="voice-transcript-wrapper">
+    <div class="voice-transcript" id="voiceTranscript"></div>
+    <button class="voice-copy-btn" id="voiceCopyBtn" title="کپی متن"><i class="fas fa-copy"></i></button>
+</div>
             <div class="voice-result" id="voiceResult" style="display:none;"></div>
 			<!-- Command history -->
 <div class="voice-history" id="voiceHistory" style="display:none;">
@@ -1980,6 +1987,17 @@
         <div class="help-popover-arrow"></div>
         <p class="help-popover-text" id="helpPopoverText"></p>
     </div>
+		<!-- Confirmation Overlay -->
+<div class="voice-confirm-overlay" id="voiceConfirmOverlay" style="display:none;">
+    <div class="voice-confirm-box">
+        <div class="voice-confirm-icon"><i class="fas fa-question-circle"></i></div>
+        <div class="voice-confirm-text" id="voiceConfirmText">آیا این دستور درست است؟</div>
+        <div class="voice-confirm-actions">
+            <button class="voice-confirm-btn confirm" id="voiceConfirmYes">بله</button>
+            <button class="voice-confirm-btn cancel" id="voiceConfirmNo">خیر</button>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>
